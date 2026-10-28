@@ -14,3 +14,7 @@
   Cache-Control: no-cache
 /index.html
   Cache-Control: no-cache
+/install
+  Cache-Control: no-cache
+/install/
+  Cache-Control: no-cache

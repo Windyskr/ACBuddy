@@ -21,8 +21,10 @@ import ProblemTable from "./components/ProblemTable";
 import Pagination from "./components/Pagination";
 import AuthModal from "./components/AuthModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
+import InstallGuide from "./components/InstallGuide";
 
 const DATA = JSON.parse(rawJson) as ProblemData;
+const IS_INSTALL_PAGE = window.location.pathname.replace(/\/+$/, "") === "/install";
 
 type ProgressPatch = {
   done?: boolean;
@@ -188,6 +190,7 @@ export default function App() {
   }, [syncFromServer]);
 
   useEffect(() => {
+    if (IS_INSTALL_PAGE) return;
     const onFirstOp = () => {
       document.removeEventListener("pointerdown", onFirstOp, true);
       void authReadyRef.current?.then(() => {
@@ -444,93 +447,101 @@ export default function App() {
     <div className="min-h-screen">
       <Header
         user={authUser}
+        installPage={IS_INSTALL_PAGE}
         onLoginClick={() => setAuthOpen(true)}
         onPasswordChange={() => setPasswordOpen(true)}
         onLogout={handleLogout}
       />
 
-      <main className="mx-auto w-full max-w-6xl px-4 pb-10">
-        {mergeNotice && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">
-            <span>{mergeNotice}</span>
-            <button
-              type="button"
-              className="shrink-0 rounded-md px-2 py-1 text-emerald-600 hover:bg-emerald-100"
-              onClick={() => setMergeNotice(null)}
-              aria-label="关闭提示"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-        {failedProgressUpdate && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
-            <span>进度保存失败：{failedProgressUpdate.message}</span>
-            <button
-              type="button"
-              className="shrink-0 rounded-md bg-white px-2.5 py-1 font-medium text-rose-700 shadow-sm hover:bg-rose-100"
-              onClick={() => void pushProgress(failedProgressUpdate.slug, failedProgressUpdate.patch)}
-            >
-              重试保存
-            </button>
-          </div>
-        )}
-        <FilterBar
-          filters={activeFilters}
-          tags={tagsWithCount}
-          userTags={userTagsWithCount}
-          stats={stats}
-          authed={authed}
-          onPatch={patchFilters}
-          onReset={resetFilters}
-          hiddenColumns={hiddenColumns}
-          onToggleColumn={toggleColumn}
-          leetcodeSite={leetcodeSite}
-          onLeetcodeSite={setLeetcodeSite}
-        />
-
-        <ProblemTable
-          items={pageItems}
-          sort={sort}
-          hiddenColumns={hiddenColumns}
-          leetcodeSite={leetcodeSite}
-          views={views}
-          authed={authed}
-          onSort={handleSort}
-          onMastery={setMasteryFor}
-          onUrgency={setUrgencyFor}
-          onSaveNote={saveNote}
-          onTags={setTagsFor}
-          onProgressChange={(slug, progress) => {
-            setProgressBySlug((current) => {
-              const next = { ...current };
-              if (progress) next[slug] = progress;
-              else delete next[slug];
-              return next;
-            });
-          }}
-          onLogin={() => setAuthOpen(true)}
-        />
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <footer className="flex gap-x-4 text-xs text-slate-400">
-            <a className="hover:text-slate-600 hover:underline" href="https://github.com/Windyskr/acbuddy" target="_blank" rel="noreferrer">
-              GitHub
-            </a>
-            <a className="hover:text-slate-600 hover:underline" href="/privacy.html" target="_blank" rel="noreferrer">
-              隐私政策
-            </a>
-          </footer>
-          <Pagination
-            total={filtered.length}
-            page={safePage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            onPage={setPage}
-            onPageSize={setPageSize}
+      {IS_INSTALL_PAGE ? (
+        <InstallGuide authed={authed} onLogin={() => setAuthOpen(true)} />
+      ) : (
+        <main className="mx-auto w-full max-w-6xl px-4 pb-10">
+          {mergeNotice && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">
+              <span>{mergeNotice}</span>
+              <button
+                type="button"
+                className="shrink-0 rounded-md px-2 py-1 text-emerald-600 hover:bg-emerald-100"
+                onClick={() => setMergeNotice(null)}
+                aria-label="关闭提示"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {failedProgressUpdate && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
+              <span>进度保存失败：{failedProgressUpdate.message}</span>
+              <button
+                type="button"
+                className="shrink-0 rounded-md bg-white px-2.5 py-1 font-medium text-rose-700 shadow-sm hover:bg-rose-100"
+                onClick={() => void pushProgress(failedProgressUpdate.slug, failedProgressUpdate.patch)}
+              >
+                重试保存
+              </button>
+            </div>
+          )}
+          <FilterBar
+            filters={activeFilters}
+            tags={tagsWithCount}
+            userTags={userTagsWithCount}
+            stats={stats}
+            authed={authed}
+            onPatch={patchFilters}
+            onReset={resetFilters}
+            hiddenColumns={hiddenColumns}
+            onToggleColumn={toggleColumn}
+            leetcodeSite={leetcodeSite}
+            onLeetcodeSite={setLeetcodeSite}
           />
-        </div>
-      </main>
+
+          <ProblemTable
+            items={pageItems}
+            sort={sort}
+            hiddenColumns={hiddenColumns}
+            leetcodeSite={leetcodeSite}
+            views={views}
+            authed={authed}
+            onSort={handleSort}
+            onMastery={setMasteryFor}
+            onUrgency={setUrgencyFor}
+            onSaveNote={saveNote}
+            onTags={setTagsFor}
+            onProgressChange={(slug, progress) => {
+              setProgressBySlug((current) => {
+                const next = { ...current };
+                if (progress) next[slug] = progress;
+                else delete next[slug];
+                return next;
+              });
+            }}
+            onLogin={() => setAuthOpen(true)}
+          />
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <footer className="flex gap-x-4 text-xs text-slate-400">
+              <a className="hover:text-slate-600 hover:underline" href="/install">
+                安装插件
+              </a>
+              <a className="hover:text-slate-600 hover:underline" href="https://github.com/Windyskr/acbuddy" target="_blank" rel="noreferrer">
+                GitHub
+              </a>
+              <a className="hover:text-slate-600 hover:underline" href="/privacy.html" target="_blank" rel="noreferrer">
+                隐私政策
+              </a>
+            </footer>
+            <Pagination
+              total={filtered.length}
+              page={safePage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              onPage={setPage}
+              onPageSize={setPageSize}
+            />
+          </div>
+        </main>
+      )}
 
       {tipOpen && !authed && (
         <div

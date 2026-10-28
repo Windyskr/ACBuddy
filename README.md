@@ -23,6 +23,16 @@
 - **表格自定义**：列可拖拽排序、拖拽调宽、按需隐藏（「紧急」默认隐藏，可在「显示列」里打开），设置持久化
 - **分页**：20 / 50 / 100 条每页，带页码省略号
 
+## 安装浏览器插件
+
+插件暂未上架应用商店，支持电脑端 Chrome（116 及以上版本）和 Edge。
+网站顶部的「安装插件」入口提供[完整安装指南](https://acbuddy.pages.dev/install)。
+
+1. 登录 GitHub，进入 [Build extension ZIP](https://github.com/Windyskr/acbuddy/actions/workflows/extension-zip.yml?query=branch%3Amain+is%3Asuccess)，选择 main 分支最近一次成功构建。
+2. 在详情页面底部的 **Artifacts** 中下载 `acbuddy-extension-chrome.zip`，解压并保留插件文件夹。
+3. 打开 `chrome://extensions/` 或 `edge://extensions/`，开启「开发者模式」，点击加载已解压扩展的按钮，选择包含 `manifest.json` 的文件夹。
+4. 在同一浏览器登录 ACBuddy，刷新力扣题目页面，从扩展菜单打开 ACBuddy 即可使用。
+
 ## 快速开始
 
 ```bash
