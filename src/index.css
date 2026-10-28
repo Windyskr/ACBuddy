@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+html {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-100 text-slate-800 antialiased;
+}
+
+.row-reveal {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+tr:hover .row-reveal,
+tr:focus-within .row-reveal,
+tr[data-open] .row-reveal {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+input[type="range"].mastery {
+  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600;
+}
+
+.md-content {
+  line-height: 1.65;
+  word-break: break-word;
+}
+.md-content h1,
+.md-content h2,
+.md-content h3 {
+  font-weight: 600;
+  margin: 0.75em 0 0.35em;
+}
+.md-content h1 {
+  font-size: 1.15rem;
+}
+.md-content h2 {
+  font-size: 1.05rem;
+}
+.md-content h3 {
+  font-size: 1rem;
+}
+.md-content p {
+  margin: 0.35em 0;
+}
+.md-content ul {
+  list-style: disc;
+  margin: 0.35em 0;
+  padding-left: 1.4em;
+}
+.md-content ol {
+  list-style: decimal;
+  margin: 0.35em 0;
+  padding-left: 1.4em;
+}
+.md-content li {
+  margin: 0.15em 0;
+}
+.md-content blockquote {
+  border-left: 3px solid #cbd5e1;
+  margin: 0.5em 0;
+  padding: 0.1em 0 0.1em 0.75em;
+  color: #64748b;
+}
+.md-content code {
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.875em;
+}
+.md-content pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.md-content pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.md-content a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md-content strong {
+  font-weight: 600;
+}
+.md-content > *:first-child {
+  margin-top: 0;
+}
+.md-content > *:last-child {
+  margin-bottom: 0;
+}

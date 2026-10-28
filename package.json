@@ -1,0 +1,41 @@
+{
+  "name": "acbuddy",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "面试高频题整理与刷题记录 —— React + Tailwind + Cloudflare Pages",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && tsc -p tsconfig.functions.json --noEmit && vite build",
+    "preview": "vite preview",
+    "dev:api": "npm run build && wrangler pages dev dist --port 8788",
+    "deploy": "npm run build && wrangler pages deploy dist",
+    "db:migrate:local": "node scripts/db-migrate.mjs local",
+    "db:migrate:remote": "node scripts/db-migrate.mjs remote",
+    "db:migrate:status": "node scripts/db-migrate.mjs local --status",
+    "db:migrate:status:remote": "node scripts/db-migrate.mjs remote --status",
+    "db:reset:local": "node scripts/db-migrate.mjs local --reset",
+    "db:seed:local": "node scripts/db-seed.mjs local",
+    "db:seed:remote": "node scripts/db-seed.mjs remote",
+    "db:key:local": "wrangler d1 execute acbuddy-db --local --command \"SELECT id, username, api_key FROM users\" --json -y",
+    "db:key:remote": "wrangler d1 execute acbuddy-db --remote --command \"SELECT id, username, api_key FROM users\" --json -y"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260911.1",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.3.0",
+    "wrangler": "^4.131.1"
+  }
+}

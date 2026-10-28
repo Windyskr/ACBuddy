@@ -1,0 +1,52 @@
+name: Build extension ZIP
+
+on:
+  push:
+    paths:
+      - 'extension/**'
+      - '.github/workflows/extension-zip.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extension-zip-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --registry=https://registry.npmjs.org
+
+      - name: Check types
+        run: npm run compile
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Package ZIP
+        working-directory: extension/.output/chrome-mv3
+        run: zip -r ../acbuddy-extension-chrome.zip .
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          path: extension/.output/acbuddy-extension-chrome.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 30

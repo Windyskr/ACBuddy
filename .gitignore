@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+*.local
+.DS_Store
+npm-debug.log*
+
+!src/lib/
+!src/lib/**
+!extension/entrypoints/lib/
+!extension/entrypoints/lib/**
+
+artifacts/
