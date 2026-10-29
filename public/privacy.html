@@ -54,6 +54,7 @@
       <ul>
         <li>网站账号保存用户名和密码散列（PBKDF2），不保存明文密码；账号另有一个系统生成的 API Key，用于程序化访问。</li>
         <li>登录状态通过会话 Cookie（<code>acb_session</code>，有效期 30 天）识别。扩展借用浏览器里的这个 Cookie 访问你的账号，不读取、不保存你的密码。</li>
+        <li>注册和登录时用 Cloudflare Turnstile 做人机验证：验证组件由 Cloudflare 提供，会根据浏览器和网络环境判断是否为真人，处理方式见 <a href="https://www.cloudflare.com/turnstile-privacy-policy/">Cloudflare Turnstile 隐私说明</a>。ACBuddy 只收到验证是否通过。</li>
         <li>为防止滥用，注册和登录按 IP 地址限流，相关计数按时间窗口过期并定期清理。</li>
       </ul>
 
