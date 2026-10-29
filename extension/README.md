@@ -2,7 +2,7 @@
 
 ACBuddy 的浏览器插件：**WXT + React + TypeScript + Manifest V3 + Side Panel**。
 用户在力扣刷题时自动记录每次作答（结果/耗时/语言/提交 id）并收集心得，与
-ACBuddy 网站同步；在力扣、codefun2000 和牛客的题目页，侧边栏 AI 助手可以读题、读代码、标出错误行。
+ACBuddy 网站同步；在力扣、codefun2000、牛客、洛谷、AtCoder 和 AcWing 的题目页，侧边栏 AI 助手可以读题、读代码、标出错误行（洛谷只能读代码）。
 
 ## 目录结构
 
@@ -41,20 +41,22 @@ extension/
 | 力扣 | `leetcode.cn`、`leetcode.com` 的 `/problems/<slug>/…`（含比赛题） | 内容脚本：`__NEXT_DATA__` + GraphQL | 全局 `monaco` | AI 助手全部工具、自动记录、计时、心得卡 |
 | codefun2000 | `/ide/<P1559>`（`/p/<P1559>` 会跳过去，比赛题也是） | 页面变量 `UiContext.pdoc`，题面是 `content` 里 `ZhContent` 的 Markdown（样例写在里面） | 全局 `monaco` | AI 助手：读题、读代码、标错 |
 | 牛客 | `www.nowcoder.com/practice/<32 位 uuid>`（题库在线编程，核心代码模式和 ACM 模式） | Vuex `store.state`：`codingProblem`、`question`（HTML 题面、输入输出描述、多组样例）、`questionTags` | `window.__ncMonacoEditorApi.editor` | AI 助手：读题、读代码、标错 |
+| 洛谷 | `www.luogu.com.cn/problem/<P1001>`（题号以大写字母开头，含 CF1A、AT_abc300_a 这类外站题） | `script#lentille-context` 的 `data.problem`：`contenu`（当前语言，外站题是中文翻译）或 `content` 的 Markdown 分节、样例、每个测试点的时空限制、0–7 档难度；标签编号用 `/_lfe/tags` 换成名字 | IDE 模式的 CodeMirror 6（`.cm-content` 的 `cmTile`，旧版叫 `cmView`） | AI 助手：读题、读代码（标不了错误行） |
+| AtCoder | `atcoder.jp/contests/<abc300>/tasks/<abc300_a>`，题号是任务名 | 服务端 HTML `#task-statement`，日文、英文各一份（用英文）；公式是 KaTeX，源码在 `annotation`；样例从「Sample Input/Output」小节拆出来 | 题目页底部提交区的 Ace（`#editor`，登录后才有），也可能切成普通文本框 `sourceCode` | AI 助手：读题、读代码、标错 |
+| AcWing | `www.acwing.com/problem/content/<1>/` | 服务端 HTML `.main-martor-content`（样例写在里面）；公式是 MathJax 2；难度在 `span.label` | Ace（`#code_editor`） | AI 助手：读题、读代码、标错（题目页要登录） |
 
 - 平台在 `lib/platforms.ts` 登记，题目用题目键「平台:题号」标识（如 `leetcode:two-sum`、`codefun:P1559`、
-  `nowcoder:75e878df…`）。侧边栏、AI 的每一步检查和页面里的编辑器工具都用同一套地址规则，
+  `nowcoder:75e878df…`、`luogu:P1001`）。`editor` 写明代码框能做什么（`full` 读代码并标错、`read` 只能读），
+  模型拿到的工具和系统提示按它来。侧边栏、AI 的每一步检查和页面里的编辑器工具都用同一套地址规则，
   `host_permissions` 要包含所有平台，否则拿不到标签页地址、也不能在页面里执行脚本（插件没有 `tabs` 权限）。
-- 新平台只在提问时用 `chrome.scripting.executeScript` 读页面里已经加载的数据，不另发请求（codefun2000 有防爬），
-  也不跑内容脚本。页面刚打开、刚切题时数据可能还没到，读题会每 0.5 秒重试，最多等 10 秒。
-- codefun2000 的 `pdoc` 里同时带着题解原文（`textSol`、`textSolHTML`），读题时排除；题面要登录才能看，没登录时顶栏照常显示，
-  新对话提示登录。
-- 牛客的全局 `monaco` 不是创建编辑器的那份（`getModels()` 为空），编辑器要从 `__ncMonacoEditorApi` 取；
-  没有 `setModelMarkers`，标错时只标红行、不显示悬停说明（说明在 AI 的回答里）。公式是 `/equation?tex=…` 图片，读题时还原成 `$…$`
-  （`alt` 里的 LaTeX 有时被截断，以地址里的 `tex` 参数为准）。地址里的 uuid 先写进 store、题目内容稍后才到，标题为空时按未加载重试。
-- 只认题库的在线编程页：牛客的笔试、考试页面和旧版 `questionTerminal` 页都不算题目页；ac.nowcoder.com（牛客竞赛，CodeMirror 5）还没接。
-- 自动记录、计时、心得卡、`get_history` 和 `get_judge_result` 目前只有力扣（`platforms.ts` 的 `tracked`）：
-  网站接口的 `PLATFORMS` 只有 leetcode，新平台的侧边栏不显示计时、进度和「未登录」提示。
+- 新平台用 `chrome.scripting.executeScript` 注入 `lib/page-readers.ts` 里各自的读题函数，读页面里已经加载的数据，
+  不另发请求（codefun2000 有防爬），也不跑内容脚本。页面刚打开、刚切题时数据可能还没到，读题会每 0.5 秒重试，最多等 10 秒。
+  洛谷站内换题是单页跳转，`lentille-context` 还是上一题：题号对不上时按页面自己的方式取一次
+  （`/problem/<题号>` 加请求头 `x-lentille-request: content-only`），取到的留在页面里。
+- 编辑器工具在页面里依次找 Monaco（牛客那份、全局那份）、Ace（只用页面建好的 `node.env.editor`，`ace.edit` 会新建编辑器）、
+  CodeMirror 6、AtCoder 的普通文本框。Ace 标错用 `fullLine` 行标记加侧栏装饰，代码一改自动清除；CodeMirror 6 的装饰要用它自己的模块，页面外加不了。
+- 题面 HTML 转文字时还原公式：MathJax 2（AcWing）去掉渲染结果、用 `script[type^="math/tex"]` 的源码，KaTeX 用 `annotation` 的源码，
+  AtCoder 没渲染的 `<var>` 本身就是 TeX。
 
 ## 消息链路
 
@@ -220,7 +222,7 @@ node tools/test-auto-record.mjs --site=leetcode.com   # 同上，在力扣国际
 node tools/test-login-guide.mjs    # 登录引导回归
 node tools/test-judge-result.mjs   # AI 读取判题结果：真实运行错误答案和编译错误代码，模型回复是模拟的（编辑器需为 C++）
 node tools/test-judge-result.mjs --submit   # 同上，再真实提交一次错误答案（记进本站的作答检查完删除）
-node tools/test-platforms.mjs      # 多平台：codefun2000（profile 需登录）、牛客两种答题模式、力扣的顶栏、读题、读代码和标错，模型回复是模拟的
+node tools/test-platforms.mjs      # 多平台：codefun2000、牛客两种答题模式、洛谷（含站内换题）、AtCoder、AcWing、力扣的顶栏、读题、模型拿到的工具、读代码和标错，模型回复是模拟的（codefun2000、洛谷 IDE、AtCoder 提交区、AcWing 要 profile 先登录）
 ```
 
 其他手动驱动工具：

@@ -1,5 +1,5 @@
 import { completedMessages, type AgentMessage } from './agent';
-import { readProblemPage, type PageReadResult } from './page-readers';
+import { pageReaders, type PageReadResult } from './page-readers';
 import { PLATFORMS, problemLabel, type PlatformId, type ProblemRef } from './platforms';
 import { pageProblemMessage, problemMessage } from './problem-text';
 
@@ -60,7 +60,7 @@ async function loadProblem(tabId: number, problem: ProblemRef) {
         }
         const title = data.title || data.translatedTitle || problem.id;
         const number = data.questionId ? String(data.questionId) : null;
-        const url = PLATFORMS.leetcode.problemUrl(new URL(data.url).hostname, problem.id);
+        const { url } = problem;
         return {
           problemTitle: problemLabel(number, title), problemUrl: url,
           content: problemMessage({ platform: 'leetcode', number, title, difficulty: data.difficultyCn ?? null, url, statement: data.description }),
@@ -70,11 +70,10 @@ async function loadProblem(tabId: number, problem: ProblemRef) {
       await wait(500);
     }
   }
-  const platform = problem.platform;
-  const url = PLATFORMS[platform].problemUrl(problem.site, problem.id);
+  const { platform, url } = problem;
   for (let attempt = 0; ; attempt++) {
     const result = await chrome.scripting.executeScript({
-      target: { tabId }, world: 'MAIN', func: readProblemPage, args: [platform, problem.id],
+      target: { tabId }, world: 'MAIN', func: pageReaders[platform], args: [problem.id],
     }).then(([injection]) => injection?.result as PageReadResult | undefined, (): PageReadResult => ({ error: '页面还在加载', retry: true }));
     if (result && 'problem' in result) {
       if (result.unavailable || !result.problem.statement.trim()) throw new Error(result.unavailable ?? '当前题目没有可读取的题面');

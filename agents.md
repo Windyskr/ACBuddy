@@ -35,7 +35,7 @@
 - 已纳入本仓库版本控制（WXT + React + TS，Manifest V3 Side Panel）。可能由多个进程并行开发：动手前先拉最新代码，提交只圈定 `extension/` 内的文件
 - 交互模型（**全自动，无手动上报按钮**）：用户在力扣（国内版 leetcode.cn、国际版 leetcode.com 都支持）点「提交」→ MAIN world 钩子（`entrypoints/leetcode-hook.content.ts`，包住页面 fetch/XHR）截获判题响应 → background 自动 `POST /api/attempts`（计时在 background 的 `storage.session` 里按题目累计，面板没开也在走：只算页面在前台且有操作的时间，5 分钟无操作自动暂停并扣掉这段（固定值，不提供设置），侧边栏可手动暂停，通过后停止、改代码才重新开始；规则写在 `background.ts` 文件头；提交语言从提交请求体抓）→ 页面右上角弹心得卡（5 秒内无点击自动消失），保存时 `PUT /api/attempts/:id` 补写该次心得，不改题目当前笔记。Side Panel 展示登录态、题目、计时和进度，并提供 AI 聊天及按题目分组的对话列表，随标签页切换与后台广播自动刷新
 - 扩展与站点对接以 `functions/api/[[route]].ts` 为准；改接口时同步改网站与扩展的调用方（见上节）
-- 多平台：支持的刷题网站登记在 `extension/entrypoints/lib/platforms.ts`（地址规则、题目键「平台:题号」、难度换算、`tracked`）。codefun2000（`/ide/<P1559>`）和牛客题库（`/practice/<uuid>`）目前只接 AI 助手（读题、读代码、标错），自动记录、计时、心得卡和作答记录只有力扣；给新平台接记录时，接口 `PLATFORMS` 也要加一项。新平台写进 `host_permissions`，否则拿不到标签页地址
+- 多平台：支持的刷题网站登记在 `extension/entrypoints/lib/platforms.ts`（地址规则、题目键「平台:题号」、难度换算、`tracked`、代码框能做什么 `editor`）。codefun2000、牛客题库、洛谷、AtCoder、AcWing 目前只接 AI 助手（读题、读代码、标错），洛谷（IDE 模式的 CodeMirror 6）能读代码但标不了错误行，自动记录、计时、心得卡和作答记录只有力扣；给新平台接记录时，接口 `PLATFORMS` 也要加一项。新平台写进 `host_permissions`，否则拿不到标签页地址
 
 ### 开发与测试命令（在 `extension/` 下）
 
@@ -48,7 +48,7 @@ npm run zip                        # 生产构建并打包 → .output/acbuddy-e
 node tools/test-auto-record.mjs    # e2e：真实提交 AC + Wrong Answer 各一次，验证自动记录/心得卡/服务器侧
 node tools/test-auto-record.mjs --site=leetcode.com   # 同上，在力扣国际版提交，并检查两站共用进度
 node tools/test-login-guide.mjs    # e2e：登录引导回归
-node tools/test-platforms.mjs      # e2e：codefun2000、牛客、力扣的顶栏、读题、读代码和标错（模拟模型，不提交）
+node tools/test-platforms.mjs      # e2e：六个平台的顶栏、读题、模型拿到的工具、读代码和标错（模拟模型，不提交；profile 要登录 codefun2000、洛谷、AtCoder、AcWing）
 ```
 
 - e2e 依赖：项目内持久 profile `.chrome-profile/`（力扣国内版、国际版与 ACBuddy 测试号的登录态都在里面，勿提交、勿在测试外占用）；测试账号凭据在 `.mcp-artifacts/site-account.json`（gitignored）；测试会独占该 profile
@@ -66,6 +66,8 @@ node tools/test-platforms.mjs      # e2e：codefun2000、牛客、力扣的顶�
 - 力扣国际版与国内版的提交、运行、判题轮询接口路径和响应字段相同，钩子与详情页兜底两站共用；但提交 id 各自编号（国内版约 7.6 亿、国际版约 21.8 亿），记录和去重都要带站点。国际版 GraphQL 也接受 `translatedTitle` / `translatedContent`，只是返回 null，读题用同一条查询即可
 - codefun2000 的 `UiContext.pdoc` 里带着题解原文（`textSol`/`textSolHTML`），读题只取 `content`（`ZhContent` 的 Markdown），题解不能进题目信息；题面要登录才能看
 - 牛客的全局 `monaco` 不是创建编辑器的那份（`getModels()` 为空），编辑器从 `window.__ncMonacoEditorApi.editor` 取，也没有 `setModelMarkers`；地址里的 uuid 先写进 Vuex，题目内容随后才到，标题为空就要当成没加载完。公式图片 `alt` 里的 LaTeX 会被截断，以地址里的 `tex` 参数为准
+- 洛谷站内换题是单页跳转，`script#lentille-context` 不会更新：读题前要核对题号，对不上就用 `/problem/<题号>` 加请求头 `x-lentille-request: content-only` 再取；外站题的中文翻译在 `contenu`，原文在 `content`
+- 洛谷 IDE 的 CodeMirror 6 视图在 `.cm-content` 的 `cmTile` 上（旧版是 `cmView`）；Ace 只用页面建好的 `node.env.editor`，别对没初始化的元素调 `ace.edit`
 - 侧边栏按标签页地址绑定题目，会比内容脚本注入、页面数据就绪更早：读题要重试（力扣是内容脚本还没回应，其他平台是数据还没到），不能一次失败就报错
 - 力扣切换面板（运行时打开「测试结果」、切到题解/提交记录）会 `history.replaceState`，Chrome 因此发 `tabs.onUpdated`（`status: 'loading'`）：这不代表换题，要比较 slug 再决定是否停止回答、切换对话
 

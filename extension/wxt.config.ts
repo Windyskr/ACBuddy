@@ -11,10 +11,11 @@ export default defineConfig({
     minimum_chrome_version: '116',
     permissions: ['sidePanel', 'storage', 'scripting'],
     optional_host_permissions: ['https://*/*', 'http://localhost/*', 'http://127.0.0.1/*'],
-    // 力扣有内容脚本（自动记录、计时）；codefun2000、牛客只在打开侧边栏提问时读题、读代码
+    // 力扣有内容脚本（自动记录、计时）；其他平台只在侧边栏读顶栏、提问时读题、读代码
     host_permissions: [
       'https://acbuddy.pages.dev/*', 'https://leetcode.cn/*', 'https://leetcode.com/*',
-      'https://codefun2000.com/*', 'https://www.nowcoder.com/*',
+      'https://codefun2000.com/*', 'https://www.nowcoder.com/*', 'https://www.luogu.com.cn/*',
+      'https://atcoder.jp/*', 'https://www.acwing.com/*',
     ],
     icons: {
       16: '/icons/icon16.png',

@@ -2,33 +2,55 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { McpClient, EXT_PATH, ARTIFACTS } from './mcp-client.mjs';
 
-// 多平台 e2e：在 codefun2000、牛客（核心代码模式、ACM 模式）和力扣的真实题目页上，检查侧边栏顶栏、
-// 新对话读到的题目信息、AI 读代码和标出错误行。模型回复是模拟的，不运行、不提交。
-// codefun2000 的题面要登录才能看：profile 需先登录。改过的编辑器代码、AI 配置和新建的对话结束时都会还原。
+// 多平台 e2e：在 codefun2000、牛客（核心代码模式、ACM 模式）、洛谷、AtCoder、AcWing 和力扣的真实题目页上，
+// 检查侧边栏顶栏、新对话读到的题目信息、模型拿到的工具、AI 读代码和标出错误行。模型回复是模拟的，不运行、不提交。
+// codefun2000、洛谷 IDE、AtCoder 提交区和 AcWing 都要登录：profile 需先登录。改过的代码、AI 配置和新建的对话结束时都会还原。
 const EXT_NAME = 'ACBuddy';
 const SETTINGS_KEY = 'acb-agent-settings';
 const CATALOG_KEY = 'acb-conversations';
 const MOCK_BASE = 'https://agent-e2e.invalid/v1';
 const CODE = 'line one\nline two\nline three';
+const FULL = ['get_code', 'highlight_errors', 'clear_highlights'];
 const CASES = [
   {
-    name: 'codefun', key: 'codefun:P1559', url: 'https://codefun2000.com/ide/P1559', editor: 'monaco',
+    name: 'codefun', key: 'codefun:P1559', url: 'https://codefun2000.com/ide/P1559', editor: 'monaco', tools: FULL,
     header: 'P1559 第2题-穿越魔法回廊', difficulty: '难度 3',
     expect: ['平台：CodeFun2000', '题目：P1559 第2题-穿越魔法回廊', '难度：3', '答题模式：ACM 模式', '标签：动态规划', '来源：京东', '时间限制：1 秒', '# 输入描述', '## 样例1'],
     // 页面数据里带着题解，题目信息里不能有
     forbid: ['斐波那契的变种'],
   },
   {
-    name: 'nowcoder-core', key: 'nowcoder:75e878df47f24fdc9dc3e400ec6058ca', url: 'https://www.nowcoder.com/practice/75e878df47f24fdc9dc3e400ec6058ca', editor: 'nowcoder',
+    name: 'nowcoder-core', key: 'nowcoder:75e878df47f24fdc9dc3e400ec6058ca', url: 'https://www.nowcoder.com/practice/75e878df47f24fdc9dc3e400ec6058ca', editor: 'nowcoder', tools: FULL,
     header: '反转链表', difficulty: '简单',
     expect: ['平台：牛客', '题目：反转链表', '答题模式：核心代码模式', '标签：链表', '$0\\leq n\\leq1000$', '样例 1', '{1,2,3}', '{3,2,1}'],
     forbid: ['[object Object]'],
   },
   {
-    name: 'nowcoder-acm', key: 'nowcoder:8c949ea5f36f422594b306a2300315da', url: 'https://www.nowcoder.com/practice/8c949ea5f36f422594b306a2300315da', editor: 'nowcoder',
+    name: 'nowcoder-acm', key: 'nowcoder:8c949ea5f36f422594b306a2300315da', url: 'https://www.nowcoder.com/practice/8c949ea5f36f422594b306a2300315da', editor: 'nowcoder', tools: FULL,
     header: '字符串最后一个单词的长度', difficulty: '简单',
     expect: ['答题模式：ACM 模式', '时间限制：1 秒', '内存限制：32 MB', '输入描述：', '输出描述：', '样例 2', '说明：', 'HelloNowcoder'],
     forbid: ['\\hspace', '<img'],
+  },
+  {
+    // #ide 直接打开 IDE 模式；之后在站内点到 P1421，检查单页换题后读的是新题
+    name: 'luogu', key: 'luogu:P1001', url: 'https://www.luogu.com.cn/problem/P1001#ide', editor: 'cm6', tools: ['get_code'],
+    header: 'P1001 A+B Problem', difficulty: '入门',
+    expect: ['平台：洛谷', '题目：P1001 A+B Problem', '难度：入门', '标签：模拟', '答题模式：ACM 模式', '## 题目描述', '## 输入格式', '样例 1', '20 30', '时间限制：1 秒', '内存限制：512 MB'],
+    forbid: ['undefined'],
+    // IDE 模式里没有推荐题目的链接，换题要在普通题目页上点
+    then: { from: 'https://www.luogu.com.cn/problem/P1001', link: '/problem/P1421', key: 'luogu:P1421', header: 'P1421 小玉买文具', expect: ['题目：P1421 小玉买文具'], forbid: ['A+B Problem'] },
+  },
+  {
+    name: 'atcoder', key: 'atcoder:abc300_a', url: 'https://atcoder.jp/contests/abc300/tasks/abc300_a', editor: 'ace:#editor', tools: FULL,
+    header: 'ABC300 A N-choice question', difficulty: null,
+    expect: ['平台：AtCoder', '题目：ABC300 A N-choice question', '时间限制：2 秒', '内存限制：1024 MB', 'Problem Statement', 'Constraints', '$N$', '样例 3'],
+    forbid: ['Copy', '<var>'],
+  },
+  {
+    name: 'acwing', key: 'acwing:1', url: 'https://www.acwing.com/problem/content/1/', editor: 'ace:#code_editor', tools: FULL,
+    header: '1. A + B', difficulty: '简单',
+    expect: ['平台：AcWing', '题目：1. A + B', '难度：简单', '答题模式：ACM 模式', '输入样例', '3 4', '$A, B$'],
+    forbid: ['𝐴'],
   },
 ];
 
@@ -82,11 +104,34 @@ const MOCK = `() => {
   window.__release = (reply) => { const g = window.__gates.find((x) => !x.entry.released); if (!g) return false; g.release(reply); return true; };
   return 'mocked';
 }`;
-// 页面里的编辑器：codefun2000、力扣用全局 monaco，牛客用它自己打包的那份
-const EDITOR = {
-  monaco: `(window.monaco?.editor.getEditors?.() ?? []).find((e) => { const r = e.getDomNode()?.getBoundingClientRect(); return e.getModel() && r && r.width > 20 && r.height > 20; })`,
-  nowcoder: 'window.__ncMonacoEditorApi?.editor',
+// 页面里的代码框：读、写、看 AI 加的标记。codefun2000 用全局 monaco，牛客用它自己那份，AtCoder、AcWing 是 Ace，洛谷 IDE 是 CodeMirror 6
+const MONACO = `(window.monaco?.editor.getEditors?.() ?? []).find((e) => { const r = e.getDomNode()?.getBoundingClientRect(); return e.getModel() && r && r.width > 20 && r.height > 20; })`;
+const monacoLike = (editor, markers) => ({
+  get: `${editor}?.getModel()?.getValue() ?? null`,
+  set: (code) => `(() => { const e = ${editor}; if (!e) return false; e.getModel().setValue(${JSON.stringify(code)}); return true; })()`,
+  touch: `(() => { const m = ${editor}.getModel(); m.setValue(m.getValue() + '\\n'); return true; })()`,
+  // 全局 monaco 的编辑器另加错误标记；牛客只标红行
+  marks: `(() => { const m = ${editor}.getModel(); return { lines: m.getAllDecorations().filter((d) => d.options.className === 'acb-agent-error-line').map((d) => d.range.startLineNumber), markers: ${markers ? "window.monaco.editor.getModelMarkers({ owner: 'acbuddy-agent' }).length" : '0'} }; })()`,
+  expectMarkers: markers ? 1 : 0,
+});
+const aceAt = (selector) => {
+  const editor = `document.querySelector('${selector}')?.env?.editor`;
+  return {
+    get: `${editor}?.getValue() ?? null`,
+    set: (code) => `(() => { const e = ${editor}; if (!e) return false; e.setValue(${JSON.stringify(code)}, -1); return true; })()`,
+    touch: `(() => { const e = ${editor}; e.setValue(e.getValue() + '\\n', 1); return true; })()`,
+    marks: `(() => { const s = ${editor}.session; return { lines: Object.values(s.getMarkers(false)).filter((m) => m.clazz === 'acb-agent-error-line').map((m) => m.range.start.row + 1), markers: String(s.$decorations?.[1] ?? '').includes('acb-agent-error-gutter') ? 1 : 0 }; })()`,
+    expectMarkers: 1,
+  };
 };
+const CM6 = `(() => { const c = document.querySelector('.cm-editor .cm-content'); const t = c?.cmTile ?? c?.cmView; return t?.view ?? t; })()`;
+const editorFor = (kind) => kind === 'monaco' ? monacoLike(MONACO, true)
+  : kind === 'nowcoder' ? monacoLike('window.__ncMonacoEditorApi?.editor', false)
+  : kind === 'cm6' ? {
+    get: `${CM6}?.state?.doc?.toString() ?? null`,
+    set: (code) => `(() => { const v = ${CM6}; if (!v?.dispatch) return false; v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: ${JSON.stringify(code)} } }); return true; })()`,
+  }
+  : kind?.startsWith('ace:') ? aceAt(kind.slice(4)) : null;
 
 const mcp = new McpClient();
 const text = async (name, args, timeout = 60000) => mcp.text(await mcp.call(name, args, timeout));
@@ -199,45 +244,61 @@ try {
   panelId = (await findPanel()) ?? panelId;
   await ev(MOCK, panelId);
 
+  const checkProblem = async (name, key, url, header, difficulty, expect, forbid) => {
+    const snap = await waitFor(async () => {
+      const value = await panelSnap();
+      return value.includes(header) ? value : null;
+    }, 30000);
+    check(`${name}_header`, !!snap && (!difficulty || snap.includes(difficulty)), `${header}${difficulty ? ` / ${difficulty}` : ''}`);
+    check(`${name}_no_timer_or_banner`, !!snap && !snap.includes('计时') && !snap.includes('作答不会被记录'));
+    const conv = await waitFor(() => conversationFor(key), 30000);
+    writeFileSync(path.join(ARTIFACTS, `platform-${name}-problem.txt`), conv?.problem ?? '');
+    const missing = expect.filter((s) => !conv?.problem.includes(s));
+    const leaked = forbid.filter((s) => conv?.problem.includes(s));
+    check(`${name}_problem_message`, !!conv && !missing.length && !leaked.length, `missing=${JSON.stringify(missing)} leaked=${JSON.stringify(leaked)}`);
+    if (url) check(`${name}_problem_url`, conv?.problemUrl === url, conv?.problemUrl);
+  };
+
   for (const [index, c] of CASES.entries()) {
     if (index > 0) await openProblem(c.url);
-    const header = await waitFor(async () => {
-      const snap = await panelSnap();
-      return snap.includes(c.header) ? snap : null;
-    }, 30000);
-    check(`${c.name}_header`, !!header && header.includes(c.difficulty), c.header);
-    check(`${c.name}_no_timer_or_banner`, !!header && !header.includes('计时') && !header.includes('作答不会被记录'));
-    const conv = await waitFor(() => conversationFor(c.key), 30000);
-    writeFileSync(path.join(ARTIFACTS, `platform-${c.name}-problem.txt`), conv?.problem ?? '');
-    const missing = c.expect.filter((s) => !conv?.problem.includes(s));
-    const leaked = c.forbid.filter((s) => conv?.problem.includes(s));
-    check(`${c.name}_problem_message`, !!conv && !missing.length && !leaked.length, `missing=${JSON.stringify(missing)} leaked=${JSON.stringify(leaked)}`);
-    check(`${c.name}_problem_url`, conv?.problemUrl === c.url, conv?.problemUrl);
+    await checkProblem(c.name, c.key, c.url.replace(/#.*$/, ''), c.header, c.difficulty, c.expect, c.forbid);
 
-    const editor = EDITOR[c.editor];
-    restoreCode.push({ url: c.url, editor, code: await ev(`() => ${editor}?.getModel()?.getValue() ?? null`, pageId) });
-    const set = await ev(`() => { const e = ${editor}; if (!e) return false; e.getModel().setValue(${JSON.stringify(CODE)}); return true; }`, pageId);
-    if (!check(`${c.name}_editor_found`, set === true)) continue;
-    const [code, highlighted] = await ask('帮我看看第 2 行', [
-      ['get_code'],
-      ['highlight_errors', { ranges: [{ startLine: 2, endLine: 2, message: '这里有问题' }] }],
-    ]);
+    const editor = editorFor(c.editor);
+    if (editor) {
+      restoreCode.push({ url: c.url, editor, code: await ev(`() => ${editor.get}`, pageId) });
+      const set = await ev(`() => ${editor.set(CODE)}`, pageId);
+      if (!check(`${c.name}_editor_found`, set === true)) continue;
+    }
+    // 能标错误行的平台读代码再标第 2 行，只能读的读一次
+    const steps = c.tools.includes('highlight_errors')
+      ? [['get_code'], ['highlight_errors', { ranges: [{ startLine: 2, endLine: 2, message: '这里有问题' }] }]]
+      : [['get_code']];
+    const first = modelRequests;
+    const [code, highlighted] = await ask('帮我看看第 2 行', steps);
+    const offered = await ev(`() => (JSON.parse(window.__mockRequests[${first}].body ?? '{}').tools ?? []).map((t) => t.name)`, panelId);
+    check(`${c.name}_tools_offered`, JSON.stringify(offered) === JSON.stringify(c.tools), JSON.stringify(offered));
     check(`${c.name}_get_code`, code?.code === CODE, JSON.stringify(code).slice(0, 120));
-    check(`${c.name}_highlight`, highlighted?.highlighted === 1, JSON.stringify(highlighted));
-    const marks = await ev(`() => {
-      const e = ${editor}; const model = e.getModel();
-      const deco = model.getAllDecorations().filter((d) => d.options.className === 'acb-agent-error-line');
-      return { lines: deco.map((d) => d.range.startLineNumber), hover: deco.some((d) => String(d.options.hoverMessage?.value ?? '').includes('这里有问题')),
-        markers: window.monaco?.editor?.getModelMarkers?.({ owner: 'acbuddy-agent' }).length ?? 0 };
-    }`, pageId);
-    // 全局 monaco 的编辑器另加错误标记（波浪线和悬停说明）；牛客只标红行
-    check(`${c.name}_highlight_shown`, marks?.lines?.[0] === 2 && !marks.hover && marks.markers === (c.editor === 'nowcoder' ? 0 : 1), JSON.stringify(marks));
-    await ev(`() => { const m = ${editor}.getModel(); m.setValue(m.getValue() + '\\n'); return true; }`, pageId);
-    const cleared = await ev(`() => ${editor}.getModel().getAllDecorations().filter((d) => d.options.className === 'acb-agent-error-line').length`, pageId);
-    check(`${c.name}_highlight_cleared_on_edit`, cleared === 0, String(cleared));
-    const back = restoreCode.at(-1);
-    if (back.code != null) await ev(`() => { ${editor}.getModel().setValue(${JSON.stringify(back.code)}); return true; }`, pageId);
-    back.done = true;
+    if (c.tools.includes('highlight_errors')) {
+      check(`${c.name}_highlight`, highlighted?.highlighted === 1, JSON.stringify(highlighted));
+      const marks = await ev(`() => ${editor.marks}`, pageId);
+      check(`${c.name}_highlight_shown`, marks?.lines?.[0] === 2 && marks.markers === editor.expectMarkers, JSON.stringify(marks));
+      await ev(`() => ${editor.touch}`, pageId);
+      const after = await ev(`() => ${editor.marks}`, pageId);
+      check(`${c.name}_highlight_cleared_on_edit`, after?.lines?.length === 0, JSON.stringify(after));
+    }
+    if (editor) {
+      const back = restoreCode.at(-1);
+      if (back.code != null) await ev(`() => ${editor.set(back.code)}`, pageId);
+      back.done = true;
+    }
+    if (c.then) {
+      await mcp.call('navigate_page', { pageId, type: 'url', url: 'about:blank', timeout: 60000 }, 90000);
+      await openProblem(c.then.from);
+      const clicked = await ev(`() => { const a = document.querySelector('a[href="${c.then.link}"]'); a?.click(); return !!a; }`, pageId);
+      if (check(`${c.name}_in_page_link`, clicked === true)) {
+        await checkProblem(`${c.name}-spa`, c.then.key, null, c.then.header, null, c.then.expect, c.then.forbid);
+      }
+    }
   }
 
   // 旧版题目页没有代码框，不算题目页
@@ -268,7 +329,7 @@ try {
     for (const item of restoreCode.filter((x) => !x.done && x.code != null)) {
       await mcp.call('navigate_page', { pageId, type: 'url', url: item.url, timeout: 60000 }, 90000).catch(() => null);
       await sleep(5000);
-      await ev(`() => { const e = ${item.editor}; if (e) e.getModel().setValue(${JSON.stringify(item.code)}); return !!e; }`, pageId).catch(() => null);
+      await ev(`() => ${item.editor.set(item.code)}`, pageId).catch(() => null);
     }
     if (panelId != null && original) {
       const restore = original.hasSettings

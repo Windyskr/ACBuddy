@@ -1,7 +1,7 @@
 import type { ProblemInfo } from './content';
 import { ApiError, getProgress, postAttempt, putAttemptNote } from './lib/api';
 import { leetcodeSiteOf, type LeetCodeSite } from './lib/leetcode';
-import { readProblemPage, type PageReadResult } from './lib/page-readers';
+import { pageReaders, type PageReadResult } from './lib/page-readers';
 import { difficultyOf, problemOf, type ProblemHeader, type ProblemRef } from './lib/platforms';
 import { IDLE_MINUTES, MAX_BEAT_GAP_MS, type PauseReason, type TimerStatus } from './lib/timing';
 
@@ -78,26 +78,26 @@ const errText = (e: unknown) =>
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** 顶栏要的题号、标题、难度：力扣问内容脚本，其他平台在页面里读 */
-async function readHeader(tabId: number, problem: ProblemRef, url: string): Promise<ProblemHeader> {
+async function readHeader(tabId: number, problem: ProblemRef): Promise<ProblemHeader> {
   if (problem.platform === 'leetcode') {
     const info = await chrome.tabs.sendMessage(tabId, { type: 'GET_PROBLEM_INFO' }) as (ProblemInfo & { ok?: boolean }) | undefined;
     if (!info?.ok) throw new Error('content script did not respond');
     return {
-      ...problem, url, number: info.questionId,
+      ...problem, number: info.questionId,
       title: info.translatedTitle || info.title || problem.id,
       difficulty: difficultyOf('leetcode', info.difficultyCn),
     };
   }
   const [injection] = await chrome.scripting.executeScript({
-    target: { tabId }, world: 'MAIN', func: readProblemPage, args: [problem.platform, problem.id],
+    target: { tabId }, world: 'MAIN', func: pageReaders[problem.platform], args: [problem.id],
   });
   const result = injection?.result as PageReadResult | undefined;
   if (result && 'problem' in result) {
     const { number, title, difficulty } = result.problem;
-    return { ...problem, url, number, title: title || problem.id, difficulty: difficultyOf(problem.platform, difficulty) };
+    return { ...problem, number, title: title || problem.id, difficulty: difficultyOf(problem.platform, difficulty) };
   }
   if (!result || result.retry) throw new Error(result?.error ?? '读取题目失败');
-  return { ...problem, url, number: null, title: problem.id, difficulty: null };
+  return { ...problem, number: null, title: problem.id, difficulty: null };
 }
 
 async function postAttemptWithRetry(input: Parameters<typeof postAttempt>[0]) {
@@ -226,12 +226,12 @@ export default defineBackground(() => {
           return;
         }
         const problem = problemOf(tab.url);
-        if (!problem || !tab.url) {
+        if (!problem) {
           sendResponse({ ok: true, problem: null });
           return;
         }
         try {
-          sendResponse({ ok: true, problem: await readHeader(tab.id, problem, tab.url) });
+          sendResponse({ ok: true, problem: await readHeader(tab.id, problem) });
         } catch (e) {
           sendResponse({ ok: false, error: errText(e) });
         }

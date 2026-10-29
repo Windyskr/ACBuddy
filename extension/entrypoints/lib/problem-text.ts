@@ -4,11 +4,27 @@ import { difficultyOf, PLATFORMS, problemLabel, type PlatformId } from './platfo
 const MAX_STATEMENT = 40000;
 
 /**
- * 题面 HTML 转纯文本：上下标写成 ^、_（10<sup>4</sup> 不能变成 104），
- * 牛客的公式图片（/equation?tex=…）还原成 $…$，其他图片留个占位
+ * 题面 HTML 转纯文本：上下标写成 ^、_（10<sup>4</sup> 不能变成 104），公式还原成 $…$
+ * （MathJax、KaTeX、AtCoder 的 <var>、牛客的公式图片 /equation?tex=…），其他图片留个占位
  */
 export function htmlToText(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
+  // MathJax 2（AcWing）：去掉渲染结果，公式源码在 script[type^="math/tex"] 里
+  doc.querySelectorAll('.MathJax_Preview, .MathJax, .MathJax_Display, .MathJax_CHTML, .MathJax_SVG, .MathJax_SVG_Display').forEach((element) => element.remove());
+  doc.querySelectorAll('script[type^="math/tex"]').forEach((script) => {
+    const tex = script.textContent?.trim() ?? '';
+    script.replaceWith(/mode\s*=\s*display/.test(script.getAttribute('type') ?? '') ? `$$${tex}$$` : `$${tex}$`);
+  });
+  // KaTeX（AtCoder）：源码在 annotation 里
+  doc.querySelectorAll('.katex').forEach((element) => {
+    const tex = element.querySelector('annotation[encoding="application/x-tex"]')?.textContent?.trim();
+    if (tex != null) element.replaceWith(element.closest('.katex-display') ? `$$${tex}$$` : `$${tex}$`);
+  });
+  // AtCoder 还没渲染的 <var> 里就是 TeX
+  doc.querySelectorAll('var').forEach((element) => {
+    const tex = element.textContent?.trim() ?? '';
+    if (tex && !tex.includes('$')) element.replaceWith(`$${tex}$`);
+  });
   doc.querySelectorAll('script, style').forEach((element) => element.remove());
   doc.querySelectorAll('img').forEach((img) => {
     const src = img.getAttribute('src') ?? '';
