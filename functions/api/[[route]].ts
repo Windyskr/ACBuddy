@@ -23,6 +23,10 @@
  * 认证（二选一，progress/attempts 接口通用）：
  * 1. 会话 Cookie acb_session（网页登录 / 扩展 credentials:include 同步登录态）
  * 2. Authorization: Bearer <api_key>（程序化调用）
+ *
+ * 注册、登录（POST /api/auth/register、/api/auth/login {username, password, turnstileToken}）：
+ * turnstileToken 来自网页上的 Cloudflare Turnstile 小组件（action 分别是 "signup"、"login"），
+ * 服务端核验通过才继续，令牌只能用一次。
  */
 import {
   MAX_PASSWORD_LENGTH,
@@ -38,12 +42,15 @@ import {
   sha256Hex,
   verifyPassword,
 } from "../../server/auth";
+import { verifyTurnstile } from "../../server/turnstile";
 
 interface Env {
   DB: D1Database;
   SITE_ORIGIN?: string;
   ALLOW_DEV_ORIGINS?: string;
   EXTENSION_IDS?: string;
+  TURNSTILE_SECRET?: string;
+  TURNSTILE_HOSTNAMES?: string;
 }
 
 interface UserRow {
@@ -112,6 +119,15 @@ function isAllowedOrigin(origin: string, env: Env): boolean {
   }
   // 未配置 EXTENSION_IDS 时放行任意已安装扩展（都能以用户身份调用本 API），生产应设置
   return /^chrome-extension:\/\/[a-p]{32}$/.test(origin);
+}
+
+/** 允许签发 Turnstile 令牌的前端域名：默认只有 SITE_ORIGIN 的域名，本地开发在 .dev.vars 里另设 */
+function turnstileHostnames(env: Env): Set<string> {
+  const configured = (env.TURNSTILE_HOSTNAMES ?? "")
+    .split(",")
+    .map((hostname) => hostname.trim())
+    .filter(Boolean);
+  return new Set(configured.length > 0 ? configured : [new URL(env.SITE_ORIGIN ?? DEFAULT_SITE_ORIGIN).hostname]);
 }
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
@@ -765,12 +781,24 @@ async function handleAuth(
 ): Promise<Response> {
   const action = segments[1];
   const ip = clientIp(request);
+  // 人机验证放在最前面：没通过的请求不占限流计数，也不写数据库
+  const passesTurnstile = (body: Record<string, unknown> | null, expectedAction: string) =>
+    verifyTurnstile({
+      secret: env.TURNSTILE_SECRET,
+      token: body?.turnstileToken,
+      action: expectedAction,
+      hostnames: turnstileHostnames(env),
+      remoteip: request.headers.get("CF-Connecting-IP") ?? undefined,
+    });
+  const turnstileFailed = () => fail(403, "人机验证未通过，请刷新页面后重试", request, env);
 
   if (action === "register" && request.method === "POST") {
+    const body = await readJsonObject(request);
+    if (!(await passesTurnstile(body, "signup"))) return turnstileFailed();
+
     const gate = await enforceRateLimit(env, `register:${ip}`, RATE_LIMITS.register);
     if (!gate.allowed) return rateLimited(gate.retryAfter, request, env);
 
-    const body = await readJsonObject(request);
     const username = typeof body?.username === "string" ? body.username.trim() : "";
     const password = typeof body?.password === "string" ? body.password : "";
     if (!USERNAME_RE.test(username)) {
@@ -800,6 +828,8 @@ async function handleAuth(
 
   if (action === "login" && request.method === "POST") {
     const body = await readJsonObject(request);
+    if (!(await passesTurnstile(body, "login"))) return turnstileFailed();
+
     const username = typeof body?.username === "string" ? body.username.trim() : "";
     const password = typeof body?.password === "string" ? body.password : "";
 

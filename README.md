@@ -100,12 +100,17 @@ npm run db:seed:local        # 创建开发账号，随机密码只打印一次
 | `SITE_ORIGIN` | 生产站点 Origin | 默认 `https://acbuddy.pages.dev`，自建部署改成自己的域名 |
 | `EXTENSION_IDS` | 扩展 ID 白名单（逗号分隔） | **强烈建议设置**。留空时任何已安装的扩展都能以用户身份调用 API |
 | `ALLOW_DEV_ORIGINS` | 放行 `http://localhost:*` 携带凭证 | **生产环境不要设**；本地开发写进 `.dev.vars` |
+| `TURNSTILE_SECRET` | Cloudflare Turnstile 密钥（登录、注册的人机验证） | **必须设**，用 `wrangler pages secret put TURNSTILE_SECRET --project-name acbuddy` 存成密钥；没设时注册和登录一律失败 |
+| `TURNSTILE_HOSTNAMES` | 允许签发验证令牌的前端域名（逗号分隔） | 默认取 `SITE_ORIGIN` 的域名；本地开发在 `.dev.vars` 里写 `localhost,127.0.0.1`，生产环境不要包含它们 |
+
+登录、注册框的 Turnstile 站点密钥在 `src/lib/turnstile.ts`。自建部署要在 Cloudflare 控制台建自己的小组件，构建时用
+`VITE_TURNSTILE_SITE_KEY` 换掉；小组件的域名要包含你的站点，本地调试还要加 `localhost` 和 `127.0.0.1`。
 
 会话 Cookie 是 `SameSite=None`（浏览器扩展需要），所以上面的来源白名单是唯一的
 CSRF 防线，放进去的来源等同于能代表用户读写全部数据。安全响应头（CSP、
 `frame-ancestors`、nosniff 等）在 `public/_headers` 里，改动前请确认没有削弱它们。
 
-服务端内置了注册/登录限流与每用户行数配额，具体数值见 `functions/api/[[route]].ts` 里的 `RATE_LIMITS` 与 `QUOTAS`。
+注册和登录都要先通过 Turnstile 人机验证。服务端还内置了注册/登录限流与每用户行数配额，具体数值见 `functions/api/[[route]].ts` 里的 `RATE_LIMITS` 与 `QUOTAS`。
 
 ## 题库数据
 

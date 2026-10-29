@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AuthUser } from "../types";
 import { api } from "../lib/api";
+import { TURNSTILE_SITE_KEY, loadTurnstile, type Turnstile } from "../lib/turnstile";
 
 interface AuthModalProps {
   onClose: () => void;
@@ -15,20 +16,65 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaFailed, setCaptchaFailed] = useState(false);
+  const captchaRef = useRef<HTMLDivElement>(null);
+  const widgetRef = useRef<{ turnstile: Turnstile; id: string } | null>(null);
+
+  // 登录、注册都要人机验证；action 在渲染时定死，切换页签就换一个小组件
+  useEffect(() => {
+    let cancelled = false;
+    loadTurnstile().then(
+      (turnstile) => {
+        if (cancelled || !captchaRef.current) return;
+        const id = turnstile.render(captchaRef.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          action: mode === "register" ? "signup" : "login",
+          theme: "light",
+          size: "flexible",
+          language: "zh-CN",
+          callback: setCaptchaToken,
+          "expired-callback": () => setCaptchaToken(""),
+          "error-callback": () => setCaptchaToken(""),
+        });
+        if (id) widgetRef.current = { turnstile, id };
+      },
+      () => {
+        if (!cancelled) setCaptchaFailed(true);
+      },
+    );
+    return () => {
+      cancelled = true;
+      const widget = widgetRef.current;
+      widgetRef.current = null;
+      try {
+        widget?.turnstile.remove(widget.id);
+      } catch {
+      }
+      setCaptchaToken("");
+      setCaptchaFailed(false);
+    };
+  }, [mode]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || !captchaToken) return;
     setBusy(true);
     setError(null);
     try {
       const data = await api<{ user: AuthUser }>(`/auth/${mode}`, {
         method: "POST",
-        body: { username: username.trim(), password },
+        body: { username: username.trim(), password, turnstileToken: captchaToken },
       });
       onSuccess(data.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "请求失败");
+      // 令牌只能核验一次，失败后换一个新的才能重试
+      const widget = widgetRef.current;
+      if (widget) {
+        setCaptchaToken("");
+        widget.turnstile.reset(widget.id);
+      }
     } finally {
       setBusy(false);
     }
@@ -89,7 +135,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           </div>
           <div>
             <label htmlFor="auth-password" className="mb-1 block text-xs font-medium text-slate-500">
-              密码（至少 6 位）
+              密码（至少 8 位）
             </label>
             <input
               id="auth-password"
@@ -102,11 +148,16 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
             />
           </div>
 
+          <div ref={captchaRef} className="min-h-[65px]" />
+
+          {captchaFailed && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">人机验证加载失败，请检查网络后刷新页面</p>
+          )}
           {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">{error}</p>}
 
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || !captchaToken}
             className="w-full rounded-xl bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {busy ? "请稍候…" : mode === "login" ? "登录" : "注册并登录"}

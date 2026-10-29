@@ -116,8 +116,10 @@ GraphQL 数据，DOM 兜底），其他平台用 `readProblemPage` 在页面里�
      换题（含 SPA 换题），页面不可见就停掉轮询和心跳。
 - API client：`entrypoints/lib/api.ts`（面板与 background 共用）。
 
-登录态获取/验证：`node tools/site-login.mjs`（在测试 Profile 里注册一个一次性账号
-并验证 `GET /api/auth/me`；`--check-only` 只做持久化检查）。**凭据不写进代码**：
+登录态检查：`node tools/site-login.mjs`（用 `GET /api/auth/me` 看测试 Profile 有没有登录）。
+网站的登录、注册都要过 Turnstile 人机验证，自动化浏览器过不了，所以脚本只检查不登录：
+没登录时，用普通 Chrome 加 `--user-data-dir=<.chrome-profile 的路径>` 打开网站，用脚本记下的凭据手动登录
+（账号不存在就先注册）。e2e 测试也不会退出这个会话。**凭据不写进代码**：
 优先读 `ACB_TEST_USERNAME` / `ACB_TEST_PASSWORD` 环境变量，否则复用
 `.mcp-artifacts/site-account.json`（gitignored），都没有就现场随机生成。
 

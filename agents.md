@@ -29,6 +29,7 @@
 - 题目用 `(platform, slug)` 标识，平台表在接口文件的 `PLATFORMS`，接新平台只加一项、不改表；作答记录另记提交站点 `site`。力扣国内版、国际版同属 `leetcode`：slug 相同、同一道题共用进度，`site` 区分 `leetcode.cn` / `leetcode.com`，提交 id 按站点去重（两站各自编号）
 - 两种笔记互不同步：`progress.note` 是题目当前笔记，只由 `PUT /api/progress/:platform/:slug` 改；`attempts.note` 是每次作答的心得。不要再让任何写入路径把心得复制成当前笔记
 - 本地调试：`npm run dev:api`（http://localhost:8788/api/*）
+- 注册、登录都要带 Cloudflare Turnstile 令牌（`turnstileToken`，action 分别是 `signup`、`login`），服务端核验通过才走原来的逻辑。本地需要 `.dev.vars` 里有 `TURNSTILE_SECRET` 和 `TURNSTILE_HOSTNAMES=localhost,127.0.0.1`。Turnstile 不放行自动化浏览器（实测连点复选框也不行），脚本和 e2e 都没法登录或注册：测试 Profile 的登录要用普通 Chrome 手动完成，e2e 别调 `/api/auth/logout` 退掉它
 
 ## Chrome 扩展（`extension/`）
 

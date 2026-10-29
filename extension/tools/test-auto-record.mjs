@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { McpClient, EXT_PATH, ARTIFACTS } from './mcp-client.mjs';
 
@@ -38,7 +38,6 @@ const setCodeFn = (kind) => `() => {
   return entry.lang;
 }`;
 const NOTE = '自动化端到端：哈希表一遍过，注意重复 key';
-const account = JSON.parse(readFileSync(path.join(ARTIFACTS, 'site-account.json'), 'utf8'));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 mkdirSync(ARTIFACTS, { recursive: true });
@@ -108,35 +107,9 @@ try {
       ),
     ),
   );
+  // 登录要过 Turnstile，脚本登不上：会话过期了就先手动登录（见 extension/README.md）
   if (me0?.status !== 200) {
-    const li = unwrap(
-      mcp.text(
-        await mcp.call(
-          'evaluate_script',
-          {
-            pageId: panelId,
-            function: `async () => {
-              const r = await fetch('${SITE}/api/auth/login', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(${JSON.stringify({ username: account.username, password: account.password })}),
-              });
-              return { status: r.status };
-            }`,
-          },
-          60000,
-        ),
-      ),
-    );
-    console.log('relogin:', JSON.stringify(li));
-    await sleep(1500);
-    await mcp.call(
-      'evaluate_script',
-      { pageId: panelId, function: `() => { location.reload(); return 'reloading'; }` },
-      60000,
-    ).catch(() => null);
-    await sleep(3000);
+    throw new Error('测试 Profile 没有登录 ACBuddy，请先用普通 Chrome 打开这个 Profile 在网站上登录测试账号');
   }
   const pageSnapshot = async () =>
     mcp.text(await mcp.call('take_snapshot', { pageId }, 60000));

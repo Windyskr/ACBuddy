@@ -6,6 +6,21 @@ const EXT_NAME = 'ACBuddy';
 const SITE = 'https://acbuddy.pages.dev';
 const PROBLEM_URL = 'https://leetcode.cn/problems/two-sum/';
 const account = JSON.parse(readFileSync(path.join(ARTIFACTS, 'site-account.json'), 'utf8'));
+// 面板载入前装上：__acbFakeLoggedOut 为 true 时 /api/auth/me 一律返回 401，测试 Profile 的真实会话不动
+const FAKE_LOGGED_OUT = `(() => {
+  window.__acbFakeLoggedOut = true;
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
+    if (window.__acbFakeLoggedOut && url.includes('/api/auth/me')) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: false, error: '未登录' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }));
+    }
+    return realFetch(input, init);
+  };
+})();`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 mkdirSync(ARTIFACTS, { recursive: true });
@@ -82,10 +97,6 @@ try {
     (snap.split('\n').find((l) => l.includes(label) && /uid=/.test(l))?.match(/\b(?:uid|ref)=([A-Za-z0-9_\-]+)/) ?? [])[1] ?? null;
   const panelEval = async (fn) =>
     unwrap(mcp.text(await mcp.call('evaluate_script', { pageId: panelId, function: fn }, 60000)));
-  const reloadPanel = async () => {
-    await panelEval(`() => { location.reload(); return 'reloading'; }`).catch(() => null);
-    await sleep(2500);
-  };
   const settingsSnapshot = async () => {
     const open = uidOf(await snapshot(), 'button "设置"');
     if (!open) return '';
@@ -103,11 +114,9 @@ try {
   const accountSnap = await settingsSnapshot();
   check('loggedin_shows_account', accountSnap.includes('已登录') && accountSnap.includes(account.username), account.username);
 
-  const lo = await panelEval(
-    `async () => { const r = await fetch('${SITE}/api/auth/logout', { method: 'POST', credentials: 'include' }); return { status: r.status }; }`,
-  );
-  check('logout_ok', lo?.status === 200, JSON.stringify(lo));
-  await reloadPanel();
+  // 登录要过 Turnstile，自动化浏览器过不了，所以不真的退出：重新载入面板时让它看到的 /api/auth/me 返回 401，后面再放开
+  await mcp.call('navigate_page', { pageId: panelId, type: 'reload', initScript: FAKE_LOGGED_OUT }, 60000);
+  await sleep(2500);
 
   snap = await snapUntil((s) => s.includes('未登录，作答不会被记录') && s.includes('去网站登录'));
   writeFileSync(path.join(ARTIFACTS, 'guide-snapshot-loggedout.txt'), snap);
@@ -131,22 +140,12 @@ try {
   };
   const siteTab = await openSiteTab();
   check('guide_button_opens_site', siteTab != null, siteTab ? `pageId=${siteTab.id}` : 'no site tab after retries');
-  snap = await snapUntil((s) => s.includes('未打开力扣题目'), 35000);
+  snap = await snapUntil((s) => s.includes('未打开题目页面'), 35000);
   writeFileSync(path.join(ARTIFACTS, 'guide-snapshot-sitetab.txt'), snap);
-  check('panel_follows_active_tab', snap.includes('未打开力扣题目') && !snap.includes('计时'), 'header switched to the non-problem state via tabs.onActivated');
+  check('panel_follows_active_tab', snap.includes('未打开题目页面') && !snap.includes('计时'), 'header switched to the non-problem state via tabs.onActivated');
 
-  const li = await panelEval(
-    `async () => {
-      const r = await fetch('${SITE}/api/auth/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: ${JSON.stringify(account.username)}, password: ${JSON.stringify(account.password)} }),
-      });
-      return { status: r.status, body: await r.json() };
-    }`,
-  );
-  check('relogin_ok', li?.status === 200 && li?.body?.ok === true, JSON.stringify(li?.body ?? li));
+  const li = await panelEval(`() => { window.__acbFakeLoggedOut = false; return 'lifted'; }`);
+  check('relogin_ok', li === 'lifted', 'fake logout lifted');
   // bringToFront=true actually activates the tab -> panel's tabs.onActivated fires
   await mcp.call('select_page', { pageId, bringToFront: true }, 60000);
   snap = await snapUntil((s) => s.includes('计时') && s.includes('两数之和'), 20000);
