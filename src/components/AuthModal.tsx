@@ -64,7 +64,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
                 setError(null);
               }}
               className={`rounded-lg py-1.5 font-medium transition-colors ${
-                mode === m ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                mode === m ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
               {m === "login" ? "登录" : "注册"}
@@ -84,7 +84,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               required
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
             />
           </div>
           <div>
@@ -98,7 +98,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               required
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
             />
           </div>
 
@@ -107,7 +107,7 @@ export default function AuthModal({ onClose, onSuccess }: AuthModalProps) {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-xl bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="w-full rounded-xl bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {busy ? "请稍候…" : mode === "login" ? "登录" : "注册并登录"}
           </button>

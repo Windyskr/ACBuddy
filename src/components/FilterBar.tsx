@@ -66,7 +66,7 @@ function Dropdown({
         title={title}
         className={`flex max-w-56 items-center gap-1 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
           active
-            ? "border-blue-300 bg-blue-50 text-blue-700"
+            ? "border-brand-300 bg-brand-50 text-brand-700"
             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
         }`}
       >
@@ -106,7 +106,7 @@ function MenuItem({
       {children}
       <span
         className={`ml-2 inline-block h-4 w-4 shrink-0 rounded border text-center text-xs leading-4 ${
-          checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white"
+          checked ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white"
         }`}
       >
         {checked ? "✓" : ""}
@@ -194,7 +194,7 @@ export default function FilterBar({
             onChange={(e) => onPatch({ keyword: e.target.value })}
             placeholder="搜索题目名称或编号"
             aria-label="搜索题目"
-            className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-400"
+            className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-sm outline-none placeholder:text-slate-400 focus:border-brand-500"
           />
         </div>
       </div>
@@ -280,7 +280,7 @@ export default function FilterBar({
             className="whitespace-nowrap text-sm tabular-nums text-slate-500"
             title={`已完成：简单 ${stats.easy} · 中等 ${stats.medium} · 困难 ${stats.hard}（有 AC 记录或掌握程度拉满）`}
           >
-            {stats.total} 题 · 已完成 <span className="font-semibold text-blue-600">{stats.done}</span>
+            {stats.total} 题 · 已完成 <span className="font-semibold text-brand-700">{stats.done}</span>
           </span>
           <Dropdown
             label={

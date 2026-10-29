@@ -59,7 +59,7 @@ export default function ChangePasswordModal({ onClose }: ChangePasswordModalProp
               onChange={(e) => setCurrentPassword(e.target.value)}
               autoComplete="current-password"
               required
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
             />
           </div>
           <div>
@@ -73,7 +73,7 @@ export default function ChangePasswordModal({ onClose }: ChangePasswordModalProp
               minLength={6}
               maxLength={128}
               required
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
             />
           </div>
           <div>
@@ -87,14 +87,14 @@ export default function ChangePasswordModal({ onClose }: ChangePasswordModalProp
               minLength={6}
               maxLength={128}
               required
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
             />
           </div>
           {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">{error}</p>}
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-xl bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="w-full rounded-xl bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {busy ? "正在修改…" : "确认修改"}
           </button>

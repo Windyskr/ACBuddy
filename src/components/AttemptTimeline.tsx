@@ -114,7 +114,7 @@ export default function AttemptTimeline({ slug, leetcodeSite, authed, onProgress
   if (!authed) {
     return (
       <p className="mt-3 text-xs text-slate-400">
-        <button type="button" onClick={onLogin} className="font-medium text-blue-600 hover:underline">
+        <button type="button" onClick={onLogin} className="font-medium text-brand-700 hover:underline">
           登录
         </button>
         后可查看历次作答与心得（与浏览器插件同步）
@@ -134,7 +134,7 @@ export default function AttemptTimeline({ slug, leetcodeSite, authed, onProgress
       <ol className="mt-2 space-y-2.5">
         {state.attempts.map((attempt) => (
           <li key={attempt.id} className="group relative pl-4">
-            <span className={`absolute left-0 top-1 h-2 w-2 rounded-full ${attempt.result === "pass" ? "bg-emerald-500" : "bg-slate-300"}`} />
+            <span className={`absolute left-0 top-1 h-2 w-2 rounded-full ${attempt.result === "pass" ? "bg-brand-500" : "bg-slate-300"}`} />
             <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-400">
               {attempt.submissionId ? (
                 <a
@@ -153,7 +153,7 @@ export default function AttemptTimeline({ slug, leetcodeSite, authed, onProgress
               {attempt.site !== leetcodeSite && <span>· {LEETCODE_SITE_LABEL[attempt.site] ?? attempt.site}</span>}
               {editingId !== attempt.id && deletingId !== attempt.id && (
                 <span className="ml-auto flex gap-1 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:opacity-0">
-                  <button type="button" onClick={() => { setEditingId(attempt.id); setDeletingId(null); }} className="rounded px-1 hover:text-blue-600">编辑</button>
+                  <button type="button" onClick={() => { setEditingId(attempt.id); setDeletingId(null); }} className="rounded px-1 hover:text-brand-700">编辑</button>
                   <button type="button" onClick={() => { setDeletingId(attempt.id); setEditingId(null); }} className="rounded px-1 hover:text-rose-600">删除</button>
                 </span>
               )}
@@ -175,10 +175,10 @@ export default function AttemptTimeline({ slug, leetcodeSite, authed, onProgress
                       setEditingId(null);
                     }
                   }}
-                  className="w-full rounded-lg border border-slate-200 p-2 text-sm outline-none focus:border-blue-400"
+                  className="w-full rounded-lg border border-slate-200 p-2 text-sm outline-none focus:border-brand-500"
                 />
                 <div className="mt-1.5 flex gap-1.5">
-                  <button type="button" disabled={busy} onClick={() => void saveEdit(attempt.id)} className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">保存</button>
+                  <button type="button" disabled={busy} onClick={() => void saveEdit(attempt.id)} className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">保存</button>
                   <button type="button" disabled={busy} onClick={() => setEditingId(null)} className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50">取消</button>
                 </div>
               </div>
@@ -209,7 +209,7 @@ function AttemptSummary({ attempt }: { attempt: AttemptItem }) {
   return (
     <>
       <span className="tabular-nums">{formatTime(attempt.createdAt)}</span>
-      <span className={`font-medium ${attempt.result === "pass" ? "text-emerald-600" : "text-slate-400"}`}>
+      <span className={`font-medium ${attempt.result === "pass" ? "text-brand-700" : "text-slate-400"}`}>
         {attempt.result === "pass" ? "通过" : attempt.verdict ? verdictLabel(attempt.verdict) : "未通过"}
       </span>
     </>

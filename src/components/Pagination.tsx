@@ -25,7 +25,7 @@ export default function Pagination({
       <select
         value={pageSize}
         onChange={(e) => onPageSize(Number(e.target.value))}
-        className="mr-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 outline-none focus:border-blue-400"
+        className="mr-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 outline-none focus:border-brand-500"
         aria-label="每页条数"
       >
         {PAGE_SIZES.map((n) => (
@@ -84,7 +84,7 @@ function PageButton({
       aria-current={active ? "page" : undefined}
       className={`h-8 min-w-8 rounded-lg px-2 tabular-nums transition-colors ${
         active
-          ? "bg-blue-600 font-medium text-white"
+          ? "bg-brand-600 font-medium text-white"
           : "text-slate-600 hover:bg-slate-200/70"
       } ${disabled ? "cursor-not-allowed opacity-40 hover:bg-transparent" : ""}`}
     >

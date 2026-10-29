@@ -54,7 +54,7 @@ function formatTime(iso: string | null): string {
 }
 
 const BADGE: Record<Difficulty, string> = {
-  EASY: "bg-emerald-50 text-emerald-600",
+  EASY: "bg-brand-50 text-brand-700",
   MEDIUM: "bg-amber-50 text-amber-600",
   HARD: "bg-rose-50 text-rose-600",
 };
@@ -130,12 +130,12 @@ function UserTagsCell({
     <td className="cursor-default px-2 py-2.5" data-no-row-toggle>
       <div className="flex w-full flex-wrap items-center gap-1 overflow-hidden">
         {tags.map((tag) => (
-          <span key={tag} className="inline-flex max-w-28 items-center gap-0.5 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700">
+          <span key={tag} className="inline-flex max-w-28 items-center gap-0.5 rounded bg-brand-50 px-1.5 py-0.5 text-xs text-brand-700">
             <span className="truncate" title={tag}>{tag}</span>
             {authed && (
               <button
                 type="button"
-                className="text-blue-300 hover:text-rose-500"
+                className="text-brand-500 hover:text-rose-500"
                 onClick={() => onChange(tags.filter((item) => item !== tag))}
                 aria-label={`删除标签 ${tag}`}
               >
@@ -150,7 +150,7 @@ function UserTagsCell({
             autoFocus
             maxLength={20}
             placeholder="输入标签"
-            className="w-20 rounded border border-blue-300 px-1.5 py-0.5 text-xs outline-none focus:border-blue-500"
+            className="w-20 rounded border border-brand-300 px-1.5 py-0.5 text-xs outline-none focus:border-brand-500"
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
@@ -163,7 +163,7 @@ function UserTagsCell({
         ) : tags.length < 10 ? (
           <button
             type="button"
-            className="row-reveal rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+            className="row-reveal rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-brand-50 hover:text-brand-700"
             onClick={() => {
               if (authed) setEditing(true);
               else onChange(tags);
@@ -314,7 +314,7 @@ export default function ProblemTable({
             onClick={() => {
               if (!ignoreSortClickRef.current) onSort(sortKey);
             }}
-            className={`inline-flex max-w-full items-center gap-1 truncate hover:text-blue-600 ${active ? "text-blue-600" : ""}`}
+            className={`inline-flex max-w-full items-center gap-1 truncate hover:text-brand-700 ${active ? "text-brand-700" : ""}`}
           >
             <span className="truncate">{COLUMN_LABEL[key]}</span>
             <span className={`shrink-0 ${active ? "" : "text-slate-300"}`}>
@@ -337,7 +337,7 @@ export default function ProblemTable({
             });
           }}
           onDragStart={(event) => event.preventDefault()}
-          className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none border-r border-transparent hover:border-blue-400 group-hover:bg-blue-100/40"
+          className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize touch-none border-r border-transparent hover:border-brand-400 group-hover:bg-brand-100/40"
           title="拖动调整列宽，双击恢复默认宽度"
         />
       </th>
@@ -483,7 +483,7 @@ function FragmentRow({
                 href={problemUrl(p, leetcodeSite)}
                 target="_blank"
                 rel="noreferrer"
-                className={`min-w-0 truncate font-medium hover:text-blue-600 hover:underline underline-offset-2 ${isDone ? "text-slate-400 line-through decoration-slate-300" : "text-slate-800"}`}
+                className={`min-w-0 truncate font-medium hover:text-brand-700 hover:underline underline-offset-2 ${isDone ? "text-slate-400 line-through decoration-slate-300" : "text-slate-800"}`}
                 title={columns.includes("tags") ? p.title : `${p.title}\n${p.tags.join("、")}`}
               >
                 {p.id && <span className="mr-1 text-slate-400">{p.id}.</span>}
@@ -495,7 +495,7 @@ function FragmentRow({
                 aria-expanded={noteOpen}
                 aria-label="笔记"
                 title={noteText ? "查看笔记" : "写笔记"}
-                className={`shrink-0 rounded p-0.5 hover:bg-blue-50 hover:text-blue-600 ${noteText || noteOpen ? "text-blue-500" : "row-reveal text-slate-400"}`}
+                className={`shrink-0 rounded p-0.5 hover:bg-brand-50 hover:text-brand-700 ${noteText || noteOpen ? "text-brand-600" : "row-reveal text-slate-400"}`}
               >
                 <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
                   <path d="M5.5 3.5h6l3 3v10h-9z" strokeLinejoin="round" />
@@ -547,7 +547,7 @@ function FragmentRow({
           >
             {lastAttemptAt && (
               <>
-                <span className={lastResult === "pass" ? "text-emerald-600" : "text-rose-500"}>
+                <span className={lastResult === "pass" ? "text-brand-700" : "text-rose-600"}>
                   {lastResult === "pass" ? "✓" : "✗"}
                 </span>
                 <span className="ml-1.5 text-slate-500">{formatDay(lastAttemptAt)}</span>
@@ -585,7 +585,7 @@ function FragmentRow({
         onClick={handleRowClick}
         data-keep-open
         data-open={noteOpen ? "" : undefined}
-        className={`cursor-pointer border-b border-slate-100 transition-colors hover:bg-blue-50/40 ${isDone ? "bg-slate-50/60" : ""}`}
+        className={`cursor-pointer border-b border-slate-100 transition-colors hover:bg-brand-50/60 ${isDone ? "bg-slate-50/60" : ""}`}
       >
         {columns.map(renderCell)}
       </tr>
@@ -608,7 +608,7 @@ function FragmentRow({
                         saveNote();
                       }
                     }}
-                    className="min-w-0 w-full rounded-lg border border-slate-200 p-2 text-sm outline-none focus:border-blue-400"
+                    className="min-w-0 w-full rounded-lg border border-slate-200 p-2 text-sm outline-none focus:border-brand-500"
                   />
                 ) : noteText ? (
                   <div
@@ -628,7 +628,7 @@ function FragmentRow({
                     <button
                       type="button"
                       onClick={saveNote}
-                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
                     >
                       保存
                     </button>
@@ -644,7 +644,7 @@ function FragmentRow({
                   <button
                     type="button"
                     onClick={() => setEditing(true)}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50"
                   >
                     编辑
                   </button>

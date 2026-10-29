@@ -458,11 +458,11 @@ export default function App() {
       ) : (
         <main className="mx-auto w-full max-w-6xl px-4 pb-10">
           {mergeNotice && (
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800" role="status">
               <span>{mergeNotice}</span>
               <button
                 type="button"
-                className="shrink-0 rounded-md px-2 py-1 text-emerald-600 hover:bg-emerald-100"
+                className="shrink-0 rounded-md px-2 py-1 text-brand-700 hover:bg-brand-100"
                 onClick={() => setMergeNotice(null)}
                 aria-label="关闭提示"
               >
@@ -546,7 +546,7 @@ export default function App() {
           className="fixed bottom-4 right-4 z-40 flex max-w-[calc(100vw-2rem)] items-center gap-1 rounded-xl border border-slate-200 bg-white py-2 pl-4 pr-2 text-sm text-slate-600 shadow-lg"
         >
           <span className="mr-1">安装插件并登录，自动记录力扣上的每次提交</span>
-          <a href="/install" className="hidden shrink-0 rounded-lg px-2 py-1 font-medium text-blue-600 hover:bg-blue-50 sm:block">
+          <a href="/install" className="hidden shrink-0 rounded-lg px-2 py-1 font-medium text-brand-700 hover:bg-brand-50 sm:block">
             安装插件
           </a>
           <button
@@ -555,7 +555,7 @@ export default function App() {
               setTipOpen(false);
               setAuthOpen(true);
             }}
-            className="shrink-0 rounded-lg px-2 py-1 font-medium text-blue-600 hover:bg-blue-50"
+            className="shrink-0 rounded-lg px-2 py-1 font-medium text-brand-700 hover:bg-brand-50"
           >
             登录
           </button>

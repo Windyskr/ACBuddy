@@ -1,11 +1,28 @@
 @import "tailwindcss";
 
+/* 品牌绿取自图标（OKLCH 色相 128°–145°，浅色偏黄、深色偏蓝）。按钮用 600（白字对比度 4.6），文字强调用 700 */
+@theme {
+  --color-brand-50: oklch(98% 0.026 128);
+  --color-brand-100: oklch(95.8% 0.056 129);
+  --color-brand-200: oklch(92% 0.102 130);
+  --color-brand-300: oklch(86.5% 0.16 132);
+  --color-brand-400: oklch(79.5% 0.205 135);
+  --color-brand-500: oklch(70% 0.198 137);
+  --color-brand-600: oklch(54.8% 0.163 139);
+  --color-brand-700: oklch(49% 0.14 141);
+  --color-brand-800: oklch(43% 0.115 142);
+  --color-brand-900: oklch(37.5% 0.095 143);
+  --color-brand-950: oklch(26.5% 0.065 145);
+  /* 页面底色：带一点品牌绿的浅灰 */
+  --color-page: oklch(97.2% 0.012 128);
+}
+
 html {
   color-scheme: light;
 }
 
 body {
-  @apply bg-slate-100 text-slate-800 antialiased;
+  @apply bg-page text-slate-800 antialiased;
 }
 
 .row-reveal {
@@ -21,7 +38,7 @@ tr[data-open] .row-reveal {
 }
 
 input[type="range"].mastery {
-  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600;
+  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-brand-600;
 }
 
 .md-content {
@@ -85,7 +102,7 @@ input[type="range"].mastery {
   color: inherit;
 }
 .md-content a {
-  color: #2563eb;
+  color: var(--color-brand-700);
   text-decoration: underline;
   text-underline-offset: 2px;
 }

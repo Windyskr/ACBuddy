@@ -12,7 +12,7 @@ const BROWSERS = {
 type Browser = keyof typeof BROWSERS;
 
 const IS_EDGE = navigator.userAgent.includes("Edg/");
-const LINK_CLASS = "font-medium text-blue-600 underline decoration-blue-200 underline-offset-4 hover:text-blue-700";
+const LINK_CLASS = "font-medium text-brand-700 underline decoration-brand-300 underline-offset-4 hover:text-brand-800";
 const CODE_CLASS = "rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700";
 
 function Step({ number, done = false, title, children }: { number: number; done?: boolean; title: string; children: ReactNode }) {
@@ -20,7 +20,7 @@ function Step({ number, done = false, title, children }: { number: number; done?
     <li className="flex gap-3 p-5 sm:gap-4 sm:px-6">
       <span
         aria-hidden="true"
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${done ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${done ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-700"}`}
       >
         {done ? "✓" : number}
       </span>
@@ -70,7 +70,7 @@ export default function InstallGuide({ authed, onLogin }: { authed: boolean; onL
           href={CHROME_STORE_URL}
           target="_blank"
           rel="noreferrer"
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         >
           从 Chrome 应用商店安装 <span aria-hidden="true">↗</span>
         </a>
@@ -106,7 +106,7 @@ export default function InstallGuide({ authed, onLogin }: { authed: boolean; onL
                   type="button"
                   aria-pressed={browser === key}
                   onClick={() => { setBrowser(key); setCopyStatus("idle"); }}
-                  className={`rounded-md px-4 py-1 text-sm font-medium transition-colors ${browser === key ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                  className={`rounded-md px-4 py-1 text-sm font-medium transition-colors ${browser === key ? "bg-white text-brand-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
                 >
                   {BROWSERS[key].name}
                 </button>
@@ -118,7 +118,7 @@ export default function InstallGuide({ authed, onLogin }: { authed: boolean; onL
                 type="button"
                 onClick={() => void copyAddress()}
                 aria-live="polite"
-                className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 hover:border-blue-200 hover:text-blue-600"
+                className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 hover:border-brand-300 hover:text-brand-700"
               >
                 {copyStatus === "copied" ? "已复制" : copyStatus === "failed" ? "复制失败，请手动复制" : "复制地址"}
               </button>
@@ -137,7 +137,7 @@ export default function InstallGuide({ authed, onLogin }: { authed: boolean; onL
         <Step number={1} done={authed} title="登录 ACBuddy">
           <p>{authed ? "你已登录，插件会自动同步这个浏览器里的登录状态。" : "在装插件的浏览器里登录，插件会自动同步登录状态，不用另外登录。"}</p>
           {!authed && (
-            <button type="button" onClick={onLogin} className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">
+            <button type="button" onClick={onLogin} className="rounded-lg bg-brand-600 px-4 py-2 font-medium text-white hover:bg-brand-700">
               登录或注册
             </button>
           )}

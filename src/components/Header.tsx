@@ -44,7 +44,7 @@ function AccountMenu({ username, onPasswordChange, onLogout }: {
         title="已登录，浏览器插件会同步此登录状态"
         className="flex max-w-24 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 sm:max-w-48 sm:px-2.5"
       >
-        <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
+        <span className="h-2 w-2 shrink-0 rounded-full bg-brand-500" aria-hidden="true" />
         <span className="truncate">{username}</span>
         <svg viewBox="0 0 12 12" className={`h-3 w-3 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true">
           <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -66,7 +66,7 @@ function AccountMenu({ username, onPasswordChange, onLogout }: {
 
 function navLinkClass(active: boolean) {
   return `rounded-lg px-2 py-1.5 text-sm font-medium sm:px-2.5 ${
-    active ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+    active ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
   }`;
 }
 
@@ -112,7 +112,7 @@ export default function Header({ user, installPage = false, onLoginClick, onPass
             <button
               type="button"
               onClick={onLoginClick}
-              className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+              className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
             >
               登录
             </button>
