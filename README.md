@@ -25,13 +25,13 @@
 
 ## 安装浏览器插件
 
-插件暂未上架应用商店，支持电脑端 Chrome（116 及以上版本）和 Edge。
-网站顶部的「安装插件」入口提供[完整安装指南](https://acbuddy.pages.dev/install)。
+插件在力扣国内版和国际版提交后自动记录结果和用时，弹出心得卡，侧边栏提供计时和 AI 辅导，记录同步到网站。
 
-1. 登录 GitHub，进入 [Build extension ZIP](https://github.com/Windyskr/acbuddy/actions/workflows/extension-zip.yml?query=branch%3Amain+is%3Asuccess)，选择 main 分支最近一次成功构建。
-2. 在详情页面底部的 **Artifacts** 中下载 `acbuddy-extension-chrome.zip`，解压并保留插件文件夹。
-3. 打开 `chrome://extensions/` 或 `edge://extensions/`，开启「开发者模式」，点击加载已解压扩展的按钮，选择包含 `manifest.json` 的文件夹。
-4. 在同一浏览器登录 ACBuddy，刷新力扣题目页面，从扩展菜单打开 ACBuddy 即可使用。
+- **Chrome**（116 及以上版本）：从 [Chrome 应用商店](https://chromewebstore.google.com/detail/acbuddy/hkjijhnnjghgndikpiaaeanilgpjfhfk)安装
+- **Edge**：打开同一个商店链接，先点页面顶部的「允许来自其他商店的扩展」，再添加
+- **无法访问 Chrome 应用商店**：按[安装指南](https://acbuddy.pages.dev/install)从 GitHub Actions 下载安装包，用开发者模式加载
+
+装好后在同一个浏览器登录 ACBuddy，打开力扣题目即可使用。
 
 ## 快速开始
 
@@ -124,14 +124,17 @@ CSRF 防线，放进去的来源等同于能代表用户读写全部数据。安
 ├── src/
 │   ├── data/problems.json      # 题库数据（打包为独立 chunk，运行时零数据请求）
 │   ├── App.tsx                 # 状态中枢：筛选/排序/分页/本地存储
-│   ├── components/             # Header / FilterBar / ProblemTable / Pagination / AboutModal
+│   ├── components/             # Header / FilterBar / ProblemTable / Pagination / InstallGuide 等
 │   ├── lib/filters.ts          # 过滤、排序、分页纯函数
 │   ├── lib/markdown.ts         # 极简 Markdown 渲染（先转义再生成标签）
 │   ├── lib/storage.ts          # useLocalStorage（写入节流）
 │   └── types.ts
+├── extension/                  # 浏览器插件（WXT + React，Manifest V3）
 ├── .dev.vars.example           # 本地开发环境变量模板（复制为 .dev.vars）
 ├── wrangler.jsonc              # Cloudflare Pages + D1 绑定配置
-└── .github/workflows/deploy.yml.disabled   # GitHub Actions 部署（默认停用）
+└── .github/workflows/
+    ├── extension-zip.yml       # 插件有改动时构建 ZIP 安装包
+    └── deploy.yml.disabled     # GitHub Actions 部署（默认停用）
 ```
 
 ## 许可

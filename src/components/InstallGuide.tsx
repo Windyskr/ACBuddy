@@ -1,31 +1,41 @@
 import { useEffect, useState, type ReactNode } from "react";
 
+const CHROME_STORE_URL = "https://chromewebstore.google.com/detail/acbuddy/hkjijhnnjghgndikpiaaeanilgpjfhfk";
 const GITHUB_URL = "https://github.com/Windyskr/acbuddy";
 const DOWNLOAD_URL = `${GITHUB_URL}/actions/workflows/extension-zip.yml?query=branch%3Amain+is%3Asuccess`;
 
+// 按钮名照抄浏览器中文界面（Chrome 155、Edge 156），浏览器改版后要跟着改
 const BROWSERS = {
-  chrome: { name: "Chrome", address: "chrome://extensions/", loadLabel: "加载已解压的扩展程序" },
-  edge: { name: "Edge", address: "edge://extensions/", loadLabel: "加载解压缩的扩展" },
+  chrome: { name: "Chrome", address: "chrome://extensions/", devMode: "开发者模式", loadLabel: "加载未打包的扩展程序" },
+  edge: { name: "Edge", address: "edge://extensions/", devMode: "开发人员模式", loadLabel: "加载解压缩的扩展" },
 };
+type Browser = keyof typeof BROWSERS;
 
-function InstallStep({ number, title, children }: { number: number; title: string; children: ReactNode }) {
+const IS_EDGE = navigator.userAgent.includes("Edg/");
+const LINK_CLASS = "font-medium text-blue-600 underline decoration-blue-200 underline-offset-4 hover:text-blue-700";
+const CODE_CLASS = "rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700";
+
+function Step({ number, done = false, title, children }: { number: number; done?: boolean; title: string; children: ReactNode }) {
   return (
-    <li className="flex gap-3 p-5 sm:gap-4 sm:p-6">
-      <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-600">
-        {number}
+    <li className="flex gap-3 p-5 sm:gap-4 sm:px-6">
+      <span
+        aria-hidden="true"
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${done ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}
+      >
+        {done ? "✓" : number}
       </span>
-      <section className="min-w-0 flex-1">
-        <h3 className="pt-0.5 text-base font-semibold text-slate-800">{title}</h3>
-        <div className="mt-2 space-y-3 text-sm leading-7 text-slate-600">{children}</div>
-      </section>
+      <div className="min-w-0 flex-1">
+        <h3 className="pt-0.5 font-semibold text-slate-800">{title}</h3>
+        <div className="mt-1.5 space-y-3 text-sm leading-7 text-slate-600">{children}</div>
+      </div>
     </li>
   );
 }
 
 export default function InstallGuide({ authed, onLogin }: { authed: boolean; onLogin: () => void }) {
-  const [browser, setBrowser] = useState<keyof typeof BROWSERS>(() => navigator.userAgent.includes("Edg/") ? "edge" : "chrome");
+  const [browser, setBrowser] = useState<Browser>(IS_EDGE ? "edge" : "chrome");
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
-  const selectedBrowser = BROWSERS[browser];
+  const selected = BROWSERS[browser];
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -41,7 +51,7 @@ export default function InstallGuide({ authed, onLogin }: { authed: boolean; onL
 
   async function copyAddress() {
     try {
-      await navigator.clipboard.writeText(selectedBrowser.address);
+      await navigator.clipboard.writeText(selected.address);
       setCopyStatus("copied");
     } catch {
       setCopyStatus("failed");
@@ -50,109 +60,95 @@ export default function InstallGuide({ authed, onLogin }: { authed: boolean; onL
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:py-12">
-      <a href="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600">
-        <span aria-hidden="true">←</span> 返回题目列表
-      </a>
-
-      <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8" aria-labelledby="install-title">
-        <div className="flex flex-wrap items-center gap-3">
-          <img src="/favicon.png" alt="" className="h-12 w-12" />
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">Chrome · Edge 浏览器插件</span>
-        </div>
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8" aria-labelledby="install-title">
+        <img src="/favicon.png" alt="" className="h-12 w-12" />
         <h1 id="install-title" className="mt-5 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">安装 ACBuddy 浏览器插件</h1>
         <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-          安装 ACBuddy，在力扣国内版与国际版自动记录作答结果和用时，随时回顾进度与心得。
+          在力扣国内版和国际版提交后，自动记录结果和用时，随手写下心得，进度同步到题目列表。
         </p>
-        <p className="mt-2 text-sm leading-6 text-slate-500">插件暂未上架应用商店，请通过 GitHub 下载安装包，按照下面的步骤完成安装。</p>
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <a
-            href={DOWNLOAD_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            前往 GitHub 下载安装包 <span aria-hidden="true">↗</span>
-          </a>
-          <a href="#install-steps" className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800">查看安装步骤 <span aria-hidden="true">↓</span></a>
-        </div>
-        <p className="mt-4 text-xs leading-6 text-slate-400">请在电脑端安装 · Chrome 116 及以上版本，或 Edge · 下载需要登录 GitHub</p>
+        <a
+          href={CHROME_STORE_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+        >
+          从 Chrome 应用商店安装 <span aria-hidden="true">↗</span>
+        </a>
+        {IS_EDGE && (
+          <p className="mt-3 text-sm leading-6 text-slate-500">Edge 打开商店页面后，先点顶部提示里的「允许来自其他商店的扩展」，再点「添加至 Chrome」。</p>
+        )}
+        <p className="mt-4 text-xs leading-6 text-slate-400">支持电脑端 Chrome 116 及以上版本和 Edge</p>
       </section>
 
-      <h2 id="install-steps" className="mt-9 scroll-mt-20 text-lg font-semibold text-slate-800">安装步骤</h2>
-      <ol className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
-        <InstallStep number={1} title="从 GitHub 下载安装包">
-          <p>
-            登录 GitHub，打开{" "}
-            <a href={DOWNLOAD_URL} target="_blank" rel="noreferrer" className="font-medium text-blue-600 underline decoration-blue-200 underline-offset-4 hover:text-blue-700">Build extension ZIP</a>
-            {" "}页面，选择 main 分支上最近一次带有绿色勾选标记的成功构建。
-          </p>
-          <p>在构建详情页面底部找到 <strong className="font-medium text-slate-800">Artifacts</strong>，点击下载下面的文件：</p>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs break-all text-slate-700">acbuddy-extension-chrome.zip</div>
-        </InstallStep>
-
-        <InstallStep number={2} title="解压并保留插件文件夹">
-          <p>将 ZIP 安装包解压到一个固定文件夹，确认文件夹中包含 <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">manifest.json</code> 文件。下一步需要选择这个文件夹。</p>
-          <p className="text-slate-500">安装后请保留这个文件夹，浏览器会持续从这里读取插件文件。</p>
-        </InstallStep>
-
-        <InstallStep number={3} title="在浏览器中加载插件">
-          <div role="group" aria-label="选择安装插件的浏览器" className="inline-flex gap-1 rounded-lg bg-slate-100 p-1">
-            {(Object.keys(BROWSERS) as Array<keyof typeof BROWSERS>).map((key) => (
+      <details className="group mt-4 rounded-2xl border border-slate-200 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-5 py-4 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:px-6 [&::-webkit-details-marker]:hidden">
+          无法访问 Chrome 应用商店？手动安装
+          <svg viewBox="0 0 12 12" className="h-3 w-3 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true">
+            <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        </summary>
+        <ol className="divide-y divide-slate-100 border-t border-slate-100">
+          <Step number={1} title="下载安装包">
+            <p>
+              登录 GitHub 后打开{" "}
+              <a href={DOWNLOAD_URL} target="_blank" rel="noreferrer" className={LINK_CLASS}>Build extension ZIP</a>
+              ，点开最上面的一次构建，在页面底部的 Artifacts 里下载 <code className={CODE_CLASS}>acbuddy-extension-chrome.zip</code>。
+            </p>
+          </Step>
+          <Step number={2} title="解压到固定位置">
+            <p>解压到一个不会删除的文件夹，浏览器会一直从这里读取插件。打开文件夹应该能直接看到 <code className={CODE_CLASS}>manifest.json</code>，看不到就再进一层。</p>
+          </Step>
+          <Step number={3} title="在浏览器中加载">
+            <div role="group" aria-label="选择浏览器" className="inline-flex gap-1 rounded-lg bg-slate-100 p-1">
+              {(Object.keys(BROWSERS) as Browser[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={browser === key}
+                  onClick={() => { setBrowser(key); setCopyStatus("idle"); }}
+                  className={`rounded-md px-4 py-1 text-sm font-medium transition-colors ${browser === key ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                >
+                  {BROWSERS[key].name}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <code className="select-all break-all text-xs text-slate-700 sm:text-sm">{selected.address}</code>
               <button
-                key={key}
                 type="button"
-                aria-pressed={browser === key}
-                onClick={() => { setBrowser(key); setCopyStatus("idle"); }}
-                className={`rounded-md px-4 py-1 text-sm font-medium transition-colors ${browser === key ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                onClick={() => void copyAddress()}
+                aria-live="polite"
+                className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 hover:border-blue-200 hover:text-blue-600"
               >
-                {BROWSERS[key].name}
+                {copyStatus === "copied" ? "已复制" : copyStatus === "failed" ? "复制失败，请手动复制" : "复制地址"}
               </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <code className="select-all break-all text-xs text-slate-700 sm:text-sm">{selectedBrowser.address}</code>
-            <button type="button" onClick={() => void copyAddress()} className="shrink-0 rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 hover:border-blue-200 hover:text-blue-600">
-              {copyStatus === "copied" ? "已复制" : "复制地址"}
+            </div>
+            <p>把地址粘贴到地址栏打开，开启「{selected.devMode}」，点「{selected.loadLabel}」，选择上一步的文件夹。</p>
+          </Step>
+        </ol>
+        <p className="border-t border-slate-100 px-5 py-4 text-xs leading-6 text-slate-500 sm:px-6">
+          手动安装的插件不会自动更新：下载新安装包覆盖文件夹里的文件，在扩展管理页点 ACBuddy 的「重新加载」，再刷新力扣页面。GitHub 上的安装包只保留 30 天，找不到时请
+          <a href={`${GITHUB_URL}/issues`} target="_blank" rel="noreferrer" className={LINK_CLASS}>反馈问题</a>。
+        </p>
+      </details>
+
+      <h2 className="mt-9 text-lg font-semibold text-slate-800">开始使用</h2>
+      <ol className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white">
+        <Step number={1} done={authed} title="登录 ACBuddy">
+          <p>{authed ? "你已登录，插件会自动同步这个浏览器里的登录状态。" : "在装插件的浏览器里登录，插件会自动同步登录状态，不用另外登录。"}</p>
+          {!authed && (
+            <button type="button" onClick={onLogin} className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">
+              登录或注册
             </button>
-          </div>
-          <p role="status" className={`text-xs leading-6 ${copyStatus === "failed" ? "text-amber-700" : "text-slate-500"}`}>
-            {copyStatus === "copied" ? "地址已复制，请粘贴到浏览器地址栏并打开。" : copyStatus === "failed" ? "复制失败，请手动选中上面的地址，复制到浏览器地址栏并打开。" : "将上面的地址粘贴到浏览器地址栏并打开。"}
-          </p>
-          <ol className="list-decimal space-y-1 pl-5">
-            <li>开启扩展管理页面中的「开发者模式」。</li>
-            <li>点击「{selectedBrowser.loadLabel}」，选择上一步解压后包含 manifest.json 的文件夹。</li>
-            <li>看到 ACBuddy 出现在扩展列表中，即表示安装完成。</li>
-          </ol>
-        </InstallStep>
-
-        <InstallStep number={4} title="登录 ACBuddy，开始刷题">
-          <p>{authed ? "你已登录 ACBuddy，插件会自动同步当前浏览器中的登录状态。" : "在安装插件的同一个浏览器中登录 ACBuddy，插件会自动同步登录状态。"}</p>
-          <p>刷新已经打开的力扣题目页面，从浏览器的扩展菜单中点击 ACBuddy，打开侧边栏。之后每次提交的结果和用时都会自动记录，也可以填写当次作答的心得。</p>
-          {authed ? (
-            <a href="/" className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 font-medium text-blue-600 hover:bg-blue-100">返回题目列表 <span aria-hidden="true">→</span></a>
-          ) : (
-            <button type="button" onClick={onLogin} className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">登录 ACBuddy</button>
           )}
-        </InstallStep>
+        </Step>
+        <Step number={2} title="打开力扣题目">
+          <p>打开任意一道力扣题目（装插件前就开着的页面要先刷新）。提交后会自动记下结果和用时，并弹出心得卡，可以随手写下思路。</p>
+        </Step>
+        <Step number={3} title="打开侧边栏">
+          <p>点工具栏上的 ACBuddy 图标打开侧边栏，查看计时和作答记录，也可以请 AI 辅导。新装的插件收在拼图形状的扩展菜单里，可以固定到工具栏。</p>
+        </Step>
       </ol>
-
-      <section className="mt-9" aria-labelledby="install-faq">
-        <h2 id="install-faq" className="text-lg font-semibold text-slate-800">常见问题</h2>
-        <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white px-5 sm:px-6">
-          <details className="py-4">
-            <summary className="cursor-pointer text-sm font-medium text-slate-700">GitHub 页面中无法下载安装包？</summary>
-            <p className="mt-3 text-sm leading-7 text-slate-500">请先登录 GitHub，再进入最近一次成功构建的详情页面，查看底部的 Artifacts。安装包保留 30 天；如果已经过期，可以通过下方的「反馈问题」联系维护者。</p>
-          </details>
-          <details className="py-4">
-            <summary className="cursor-pointer text-sm font-medium text-slate-700">加载时提示找不到 manifest.json？</summary>
-            <p className="mt-3 text-sm leading-7 text-slate-500">请先完成解压，并选择直接包含 manifest.json 的文件夹。如果解压后还有一层文件夹，请进入其中查找该文件。</p>
-          </details>
-          <details className="py-4">
-            <summary className="cursor-pointer text-sm font-medium text-slate-700">如何更新已经安装的插件？</summary>
-            <p className="mt-3 text-sm leading-7 text-slate-500">下载新的安装包并解压，用新版文件覆盖原插件文件夹中的内容，然后在浏览器扩展管理页面点击 ACBuddy 的「重新加载」，最后刷新力扣题目页面。</p>
-          </details>
-        </div>
-      </section>
 
       <footer className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-slate-400">
         <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="hover:text-slate-600 hover:underline">GitHub</a>

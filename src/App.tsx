@@ -521,9 +521,6 @@ export default function App() {
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <footer className="flex gap-x-4 text-xs text-slate-400">
-              <a className="hover:text-slate-600 hover:underline" href="/install">
-                安装插件
-              </a>
               <a className="hover:text-slate-600 hover:underline" href="https://github.com/Windyskr/acbuddy" target="_blank" rel="noreferrer">
                 GitHub
               </a>
@@ -546,9 +543,12 @@ export default function App() {
       {tipOpen && !authed && (
         <div
           role="status"
-          className="fixed bottom-4 right-4 z-40 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-slate-200 bg-white py-2.5 pl-4 pr-2 text-sm text-slate-600 shadow-lg"
+          className="fixed bottom-4 right-4 z-40 flex max-w-[calc(100vw-2rem)] items-center gap-1 rounded-xl border border-slate-200 bg-white py-2 pl-4 pr-2 text-sm text-slate-600 shadow-lg"
         >
-          <span>登录后可同步作答记录与插件心得</span>
+          <span className="mr-1">安装插件并登录，自动记录力扣上的每次提交</span>
+          <a href="/install" className="hidden shrink-0 rounded-lg px-2 py-1 font-medium text-blue-600 hover:bg-blue-50 sm:block">
+            安装插件
+          </a>
           <button
             type="button"
             onClick={() => {
