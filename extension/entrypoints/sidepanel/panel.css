@@ -8,12 +8,14 @@
   --text-strong: #0f172a;
   --muted: #64748b;
   --faint: #94a3b8;
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-soft: #eff6ff;
-  --ring: #bfdbfe;
-  --pass: #059669;
-  --pass-soft: #ecfdf5;
+  /* 品牌绿和网站一致（取自图标）：按钮、边框用 --primary，文字用 --primary-text（浅绿底上也够 AA） */
+  --primary: #358614;
+  --primary-hover: #29731d;
+  --primary-text: #29731d;
+  --primary-soft: #f3fcea;
+  --ring: #cef3aa;
+  --pass: #29731d;
+  --pass-soft: #f3fcea;
   --medium: #d97706;
   --warn: #b45309;
   --warn-soft: #fffbeb;
@@ -77,7 +79,7 @@ button:disabled { cursor: default; }
 .button-primary { border-color: var(--primary); background: var(--primary); color: #fff; }
 .button-primary:hover:not(:disabled) { border-color: var(--primary-hover); background: var(--primary-hover); }
 .button:disabled { opacity: .55; }
-.link-button { flex: none; padding: 0; border: 0; background: none; color: var(--primary); font-weight: 500; }
+.link-button { flex: none; padding: 0; border: 0; background: none; color: var(--primary-text); font-weight: 500; }
 .link-button:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 .sheet {
@@ -100,7 +102,7 @@ button:disabled { cursor: default; }
 .history-item:has([aria-current="true"]) { background: var(--primary-soft); }
 .history-select { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; padding: 6px 4px 6px 8px; border: 0; background: none; text-align: left; }
 .history-select span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.history-select[aria-current="true"] span { color: var(--primary); font-weight: 500; }
+.history-select[aria-current="true"] span { color: var(--primary-text); font-weight: 500; }
 .history-select time { flex: none; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
 .history-delete { opacity: 0; }
 .history-item:hover .history-delete, .history-delete:focus-visible, .history-delete[data-confirm] { opacity: 1; }

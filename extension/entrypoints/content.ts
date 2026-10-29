@@ -162,7 +162,7 @@ function showResultCard(d: SubmitDetail) {
       box-shadow: 0 10px 30px rgba(15, 23, 42, .16); animation: card-in .18s ease-out; }
     .head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .result { font-size: 14px; font-weight: 600; }
-    .result.pass { color: #059669; }
+    .result.pass { color: #29731d; }
     .result.fail { color: #e11d48; }
     .brand { color: #94a3b8; font-size: 11px; }
     .close { margin-left: auto; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px;
@@ -171,17 +171,17 @@ function showResultCard(d: SubmitDetail) {
     textarea { display: block; width: 100%; box-sizing: border-box; min-height: 52px; padding: 6px 9px; resize: vertical;
       border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: inherit; font: inherit; }
     textarea::placeholder { color: #94a3b8; }
-    textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px #bfdbfe; }
+    textarea:focus { outline: none; border-color: #358614; box-shadow: 0 0 0 3px #cef3aa; }
     .foot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .status { flex: 1; min-width: 0; color: #64748b; font-size: 12px; }
     .status.error { color: #e11d48; }
-    .save { flex: none; padding: 4px 12px; border: 0; border-radius: 6px; background: #2563eb; color: #fff;
+    .save { flex: none; padding: 4px 12px; border: 0; border-radius: 6px; background: #358614; color: #fff;
       font: 500 12px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; cursor: pointer; }
-    .save:hover { background: #1d4ed8; }
+    .save:hover { background: #29731d; }
     .save:disabled { opacity: .6; cursor: default; }
     .countdown { position: absolute; left: 0; bottom: 0; width: 100%; height: 2px; transform-origin: left;
       animation: countdown 5s linear forwards; }
-    .pass .countdown { background: #10b981; }
+    .pass .countdown { background: #5bb924; }
     .fail .countdown { background: #f43f5e; }
     @keyframes countdown { to { transform: scaleX(0); } }
     @keyframes card-in { from { opacity: 0; transform: translateY(-6px); } }
