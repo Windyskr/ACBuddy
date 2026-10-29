@@ -10,7 +10,7 @@ import { openSite } from '../lib/api';
 import { leetcodeSiteOf } from '../lib/leetcode';
 import AssistantThread, { type Action } from './AssistantThread';
 import Sheet from './Sheet';
-import { HistoryIcon, PlusIcon, SettingsIcon, TrashIcon } from './icons';
+import { ExternalLinkIcon, HistoryIcon, PlusIcon, SettingsIcon, TrashIcon } from './icons';
 
 const emptySettings: AgentSettings = { baseUrl: '', model: '', apiKey: '' };
 type Target = { tabId: number; slug: string };
@@ -267,6 +267,7 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
       <div className="panel-actions">
         <button type="button" className="icon-button" aria-label="对话记录" title="对话记录" onClick={() => setShowHistory(true)}><HistoryIcon /></button>
         <button type="button" className="icon-button" aria-label="新建对话" title="新建对话" disabled={!target || loading} onClick={newConversation}><PlusIcon /></button>
+        <button type="button" className="icon-button" aria-label="打开 ACBuddy 网站" title="打开 ACBuddy 网站" onClick={() => openSite()}><ExternalLinkIcon /></button>
         <button type="button" className="icon-button" aria-label="设置" title="设置" disabled={busy} onClick={openSettings}><SettingsIcon /></button>
       </div>
     </header>

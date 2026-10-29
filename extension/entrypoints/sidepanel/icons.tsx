@@ -9,6 +9,7 @@ const icon = (paths: ReactNode) => (props: IconProps) => (
 export const PlusIcon = icon(<path d="M12 5v14M5 12h14" />);
 export const CloseIcon = icon(<path d="M6 6l12 12M18 6 6 18" />);
 export const HistoryIcon = icon(<><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" /><path d="M3 4v4.5h4.5" /><path d="M12 7.5V12l3 2" /></>);
+export const ExternalLinkIcon = icon(<><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" /></>);
 export const SettingsIcon = icon(<><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></>);
 export const SendIcon = icon(<path d="M12 19V5M6 11l6-6 6 6" />);
 export const ArrowDownIcon = icon(<path d="M12 5v14M6 13l6 6 6-6" />);

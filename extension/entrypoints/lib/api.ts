@@ -95,4 +95,9 @@ export const postAttempt = (input: {
 export const putAttemptNote = (id: number, note: string) =>
   call<{ attempt: Attempt }>(`/api/attempts/${id}`, { method: 'PUT', body: JSON.stringify({ note }) });
 
-export const openSite = () => chrome.tabs.create({ url: SITE_URL });
+// 当前窗口里已经开着网站就切过去，不再新开标签页
+export async function openSite() {
+  const [tab] = await chrome.tabs.query({ url: `${SITE_URL}/*`, currentWindow: true });
+  if (tab?.id != null) await chrome.tabs.update(tab.id, { active: true });
+  else await chrome.tabs.create({ url: SITE_URL });
+}
