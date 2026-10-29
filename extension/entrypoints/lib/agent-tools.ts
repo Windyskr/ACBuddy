@@ -1,7 +1,9 @@
+import type { JudgeRecord } from './judge';
+
 // This function is serialized by chrome.scripting; keep every dependency inside it.
 export function editorTool(
   slug: string,
-  action: 'read' | 'highlight' | 'clear',
+  action: 'read' | 'judge' | 'highlight' | 'clear',
   snapshot: { code: string; uri: string } | null,
   ranges: { startLine: number; endLine: number; message: string }[],
 ) {
@@ -28,6 +30,7 @@ export function editorTool(
         setModelMarkers(model: Model, owner: string, markers: unknown[]): void;
       } };
       __acbAgentHighlights?: { clear(): void };
+      __acbLastJudge?: JudgeRecord;
     };
     if (location.pathname.match(/\/problems\/([a-z0-9-]+)/i)?.[1] !== slug) {
       throw new Error('题目已经切换，请重新提问');
@@ -51,6 +54,13 @@ export function editorTool(
     const nodes = [...document.querySelectorAll<HTMLElement>('.monaco-editor[data-uri]')].filter(isVisible);
     const domModel = nodes.length === 1 ? models.find((model) => model.uri.toString() === nodes[0]!.dataset.uri) : null;
     const model = selected?.getModel() ?? domModel;
+    if (action === 'judge') {
+      const judge = page.__acbLastJudge;
+      if (judge?.slug !== slug) throw new Error('当前页面还没有这道题的运行或提交结果（刷新页面后会清空），请先运行或提交代码');
+      const { code, ...result } = judge;
+      // 判题后改过代码，结果就对应改动前的代码；认不出当前编辑器时不下结论
+      return { ...result, codeChanged: model && code != null ? model.getValue() !== code : null };
+    }
     if (!model) throw new Error('无法确定当前编辑器，请关闭其他代码视图后重试');
     if (action === 'read') {
       const code = model.getValue();

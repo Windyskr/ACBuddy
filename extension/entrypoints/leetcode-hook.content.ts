@@ -1,3 +1,5 @@
+import { judgeRecord, type JudgeRequest } from './lib/judge';
+
 export default defineContentScript({
   matches: ['https://leetcode.cn/*', 'https://leetcode.com/*'],
   world: 'MAIN',
@@ -7,10 +9,9 @@ export default defineContentScript({
     w.__acbHookInstalled = true;
 
     const PROBLEM_RE = /\/problems\/([a-z0-9-]+)/;
-    const SUBMIT_RE = /\/problems\/([a-z0-9-]+)\/submit\/?(\?|$)/;
     const JUDGE_RE = /check|submission/i;
-    // 力扣限流时入队请求回 429（空 body、无 Retry-After），服务端没有建任务，原样重发是安全的
-    const ENQUEUE_RE = /\/problems\/[a-z0-9-]+\/(submit|interpret_solution)\/?(\?|$)/;
+    // 提交、运行的入队请求。力扣限流时回 429（空 body、无 Retry-After），服务端没有建任务，原样重发是安全的
+    const ENQUEUE_RE = /\/problems\/([a-z0-9-]+)\/(submit|interpret_solution)\/?(\?|$)/;
     const RETRY_DELAYS_MS: number[] = [
       ...Array(3).fill(1_000),
       ...Array(5).fill(2_000),
@@ -25,7 +26,8 @@ export default defineContentScript({
       submissionId?: string;
     };
 
-    let lastSubmit: { slug: string; lang?: string } | null = null;
+    let lastSubmit: JudgeRequest | null = null;
+    let lastRun: JudgeRequest | null = null;
 
     const post = (data: Record<string, unknown>) => {
       window.postMessage({ source: 'acb-leetcode-hook', ...data }, '*');
@@ -53,49 +55,61 @@ export default defineContentScript({
 
     const inspect = (url: string, text: string | null | undefined) => {
       if (!text || !JUDGE_RE.test(url)) return;
-      let j: { state?: string; status_msg?: string; submission_id?: number | string };
+      let j: Record<string, unknown> | null;
       try {
         j = JSON.parse(text);
       } catch {
         return;
       }
+      const verdict = j?.status_msg;
       // 力扣判题完成时 state 为 "SUCCESS"；兼容 "FINISHED" 以防接口变动
-      if ((j.state !== 'SUCCESS' && j.state !== 'FINISHED') || typeof j.status_msg !== 'string') return;
+      if (!j || (j.state !== 'SUCCESS' && j.state !== 'FINISHED') || typeof verdict !== 'string') return;
       // 「运行」也轮询同一个接口、返回同样的字段，只是 id 形如 runcode_…；只有数字 id 才是提交
       const submissionId = j.submission_id != null ? String(j.submission_id) : undefined;
-      if (submissionId && !/^\d+$/.test(submissionId)) return;
-      const slug = lastSubmit?.slug ?? location.pathname.match(PROBLEM_RE)?.[1] ?? null;
+      const isRun = submissionId != null && !/^\d+$/.test(submissionId);
+      const request = isRun ? lastRun : lastSubmit;
+      const slug = request?.slug ?? location.pathname.match(PROBLEM_RE)?.[1] ?? null;
       if (!slug) return;
+      w.__acbLastJudge = judgeRecord(isRun ? 'run' : 'submit', { ...request, slug }, j);
+      if (isRun) return;
       emit({
         slug,
-        result: j.status_msg === 'Accepted' ? 'pass' : 'fail',
-        verdict: j.status_msg,
+        result: verdict === 'Accepted' ? 'pass' : 'fail',
+        verdict,
         language: lastSubmit?.lang,
         submissionId,
       });
     };
 
-    const langFromBody = (body: unknown): string | undefined => {
-      if (typeof body !== 'string') return undefined;
+    // 记下最近一次提交、运行请求里的语言和代码（运行还有测试输入），判题结果回来时用
+    const remember = (url: string, body: unknown): 'submit' | 'run' | undefined => {
+      const m = ENQUEUE_RE.exec(url);
+      if (!m) return undefined;
+      let data: Record<string, unknown> = {};
       try {
-        const lang = JSON.parse(body).lang;
-        return typeof lang === 'string' ? lang : undefined;
+        const parsed = typeof body === 'string' ? JSON.parse(body) : null;
+        if (parsed && typeof parsed === 'object') data = parsed;
       } catch {
-        return undefined;
       }
+      const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
+      const request = { slug: m[1]!, lang: text(data.lang), code: text(data.typed_code), input: text(data.data_input) };
+      if (m[2] === 'submit') {
+        lastSubmit = request;
+        return 'submit';
+      }
+      lastRun = request;
+      return 'run';
     };
 
     const origFetch = window.fetch.bind(window);
     window.fetch = async (input: any, init?: RequestInit): Promise<Response> => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const sm = typeof url === 'string' ? url.match(SUBMIT_RE) : null;
-      if (sm?.[1]) lastSubmit = { slug: sm[1], lang: langFromBody(init?.body) };
+      const action = typeof url === 'string' ? remember(url, init?.body) : undefined;
       let res = await origFetch(input, init);
-      const enqueue = (typeof input === 'string' || input instanceof URL) && typeof init?.body === 'string'
-        ? ENQUEUE_RE.exec(url)?.[1] : undefined;
-      if (enqueue && res.status === 429) {
-        res = await retryThrottled(enqueue === 'submit' ? 'submit' : 'run', res, () => origFetch(input, init));
+      const resendable = (typeof input === 'string' || input instanceof URL) && typeof init?.body === 'string';
+      if (action && resendable && res.status === 429) {
+        res = await retryThrottled(action, res, () => origFetch(input, init));
       }
       if (typeof url === 'string' && JUDGE_RE.test(url)) {
         void res
@@ -115,8 +129,7 @@ export default defineContentScript({
     const xhrSend = XMLHttpRequest.prototype.send as any;
     XMLHttpRequest.prototype.send = function (this: any, body?: any) {
       const url: string = this.__acbUrl ?? '';
-      const sm = url.match(SUBMIT_RE);
-      if (sm?.[1]) lastSubmit = { slug: sm[1], lang: langFromBody(body) };
+      remember(url, body);
       this.addEventListener('load', () => {
         try {
           inspect(url, this.responseText);
