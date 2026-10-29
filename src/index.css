@@ -13,8 +13,6 @@
   --color-brand-800: oklch(43% 0.115 142);
   --color-brand-900: oklch(37.5% 0.095 143);
   --color-brand-950: oklch(26.5% 0.065 145);
-  /* 页面底色：带一点品牌绿的浅灰 */
-  --color-page: oklch(97.2% 0.012 128);
 }
 
 html {
@@ -22,7 +20,7 @@ html {
 }
 
 body {
-  @apply bg-page text-slate-800 antialiased;
+  @apply bg-slate-100 text-slate-800 antialiased;
 }
 
 .row-reveal {
