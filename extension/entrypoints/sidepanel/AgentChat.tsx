@@ -7,13 +7,13 @@ import {
   type Conversation, type ConversationCatalog,
 } from '../lib/agent-conversation';
 import { openSite } from '../lib/api';
-import { leetcodeSiteOf } from '../lib/leetcode';
+import { problemOf, type ProblemRef } from '../lib/platforms';
 import AssistantThread, { type Action } from './AssistantThread';
 import Sheet from './Sheet';
 import { ExternalLinkIcon, HistoryIcon, PlusIcon, SettingsIcon, TrashIcon } from './icons';
 
 const emptySettings: AgentSettings = { baseUrl: '', model: '', apiKey: '' };
-type Target = { tabId: number; slug: string };
+type Target = { tabId: number; problem: ProblemRef };
 
 const timeLabel = (value: number) => {
   const date = new Date(value);
@@ -26,7 +26,7 @@ const timeLabel = (value: number) => {
     ? { month: 'numeric', day: 'numeric' } : { year: 'numeric', month: 'numeric', day: 'numeric' });
 };
 
-export default function AgentChat({ slug, account, header }: { slug: string | null; account: string | null | undefined; header: ReactNode }) {
+export default function AgentChat({ problemKey, account, header }: { problemKey: string | null; account: string | null | undefined; header: ReactNode }) {
   const [settings, setSettings] = useState<AgentSettings>(emptySettings);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [draft, setDraft] = useState<AgentSettings>(emptySettings);
@@ -115,12 +115,12 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
     const query = ++targetQuery.current;
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const info = tab?.id != null ? await chrome.tabs.sendMessage(tab.id, { type: 'GET_PROBLEM_INFO' }).catch(() => null) : null;
       if (!mounted.current || query !== targetQuery.current) return;
-      const next: Target | null = tab?.id != null && info?.ok && info?.slug ? { tabId: tab.id, slug: info.slug } : null;
-      if (targetRef.current?.tabId === next?.tabId && targetRef.current?.slug === next?.slug) return;
+      const problem = problemOf(tab?.url);
+      const next: Target | null = tab?.id != null && problem ? { tabId: tab.id, problem } : null;
+      if (targetRef.current?.tabId === next?.tabId && targetRef.current?.problem.key === next?.problem.key) return;
       targetRef.current = next; setTarget(next);
-      if (next) await openView(() => openProblemConversation(next.tabId, next.slug));
+      if (next) await openView(() => openProblemConversation(next.tabId, next.problem));
       else {
         ++version.current; controller.current?.abort(); controller.current = null;
         history.current = completedMessages(history.current); setMessages(history.current);
@@ -149,7 +149,7 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
       window.removeEventListener('focus', syncTarget);
     };
   }, [syncTarget]);
-  useEffect(() => { void syncTarget(); }, [slug, syncTarget]);
+  useEffect(() => { void syncTarget(); }, [problemKey, syncTarget]);
 
   const persist = (id: string, value: AgentMessage[]) => {
     pendingSave.current = pendingSave.current.catch(() => {}).then(() => saveConversation(id, value)).catch(() => {
@@ -162,7 +162,7 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
   };
   const newConversation = () => {
     if (!target || loading) return;
-    void openView(() => createConversation(target.tabId, target.slug));
+    void openView(() => createConversation(target.tabId, target.problem));
   };
   const remove = (id: string) => {
     if (loading) return;
@@ -170,7 +170,7 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
     if (old?.id === id) {
       void openView(async () => {
         const next = await deleteConversation(id);
-        const replacement = next.conversations.find((item) => item.slug === old.slug) ?? next.conversations[0];
+        const replacement = next.conversations.find((item) => item.key === old.key) ?? next.conversations[0];
         return replacement ? selectConversation(replacement.id) : null;
       });
     } else {
@@ -195,19 +195,15 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
   };
   const openSettings = () => { setDraft(settings); setSettingsStatus(''); setShowSettings(true); };
 
-  const canSend = !!conversation && !!target && conversation.slug === target.slug && !loading && history.current[0]?.kind === 'problem';
+  const canSend = !!conversation && !!target && conversation.key === target.problem.key && !loading && history.current[0]?.kind === 'problem';
   let hint = '';
   let hintAction: Action | undefined;
   if (loading) hint = '正在加载对话，可以先输入草稿。';
-  else if (!conversation) hint = target ? '选择或新建对话后可以发送。' : '打开力扣题目后可以提问。';
-  else if (!target || conversation.slug !== target.slug) {
-    const { slug } = conversation;
+  else if (!conversation) hint = target ? '选择或新建对话后可以发送。' : '打开题目页面后可以提问。';
+  else if (!target || conversation.key !== target.problem.key) {
+    const { problemUrl } = conversation;
     hint = `这是「${conversation.problemTitle}」的对话，打开该题后可以继续提问。`;
-    hintAction = {
-      label: '打开题目',
-      run: () => void chrome.tabs.query({ active: true, currentWindow: true }).then(([active]) =>
-        chrome.tabs.create({ url: `https://${leetcodeSiteOf(active?.url) ?? 'leetcode.cn'}/problems/${slug}/` })),
-    };
+    hintAction = { label: '打开题目', run: () => void chrome.tabs.create({ url: problemUrl }) };
   } else if (history.current[0]?.kind !== 'problem') hint = '题目信息尚未加载完成，可以先输入草稿。';
   else if (settingsLoaded && (!settings.baseUrl || !settings.model)) {
     hint = '配置 AI 模型后即可提问。';
@@ -232,7 +228,7 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
     const isCurrent = () => mounted.current && ticket === version.current && controller.current === abort;
     try {
       await runAgent({
-        settings, ...target, messages: next, signal: abort.signal,
+        settings, tabId: target.tabId, problem: target.problem, messages: next, signal: abort.signal,
         onMessage(message) {
           if (!isCurrent() || abort.signal.aborted) return;
           history.current = [...history.current, message];
@@ -251,14 +247,14 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
     }
   };
 
-  const slugs = [...new Set(catalog.conversations.map((item) => item.slug))];
-  slugs.sort((a, b) => Number(b === target?.slug) - Number(a === target?.slug));
-  const groups = slugs.map((problemSlug) => ({
-    slug: problemSlug, conversations: catalog.conversations.filter((item) => item.slug === problemSlug),
+  const keys = [...new Set(catalog.conversations.map((item) => item.key))];
+  keys.sort((a, b) => Number(b === target?.problem.key) - Number(a === target?.problem.key));
+  const groups = keys.map((key) => ({
+    key, conversations: catalog.conversations.filter((item) => item.key === key),
   }));
   const closeHistory = () => { setShowHistory(false); setConfirmDelete(null); };
   const errorAction: Action | undefined = error && target && !conversation && !loading
-    ? { label: '重新加载对话', run: () => void openView(() => openProblemConversation(target.tabId, target.slug)) }
+    ? { label: '重新加载对话', run: () => void openView(() => openProblemConversation(target.tabId, target.problem)) }
     : undefined;
 
   return <section className="agent-chat" aria-label="AI 编程助手">
@@ -278,8 +274,8 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
       activity={activity} error={error} errorAction={errorAction} onSend={send} onCancel={() => controller.current?.abort()} />
     <Sheet open={showHistory} title={`对话记录（${catalog.conversations.length}）`} onClose={closeHistory}>
       <nav aria-label="按题目查看对话">
-        {groups.map((group) => <section key={group.slug} className="history-group" aria-label={group.conversations[0]?.problemTitle}>
-          <h3>{group.conversations[0]?.problemTitle}{target?.slug === group.slug && <span className="badge">当前题目</span>}</h3>
+        {groups.map((group) => <section key={group.key} className="history-group" aria-label={group.conversations[0]?.problemTitle}>
+          <h3>{group.conversations[0]?.problemTitle}{target?.problem.key === group.key && <span className="badge">当前题目</span>}</h3>
           <ul>{group.conversations.map((item) => {
             const confirming = confirmDelete === item.id;
             return <li key={item.id} className="history-item">
@@ -297,7 +293,7 @@ export default function AgentChat({ slug, account, header }: { slug: string | nu
             </li>;
           })}</ul>
         </section>)}
-        {!groups.length && <p className="muted">还没有对话，打开力扣题目后会自动创建。</p>}
+        {!groups.length && <p className="muted">还没有对话，打开题目页面后会自动创建。</p>}
       </nav>
     </Sheet>
     <Sheet open={showSettings} title="设置" onClose={() => setShowSettings(false)}>

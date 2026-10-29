@@ -10,7 +10,7 @@ const SITE = 'https://acbuddy.pages.dev';
 const LEETCODE_SITE = process.argv.includes('--site=leetcode.com') ? 'leetcode.com' : 'leetcode.cn';
 const SUBMIT = process.argv.includes('--submit');
 const SETTINGS_KEY = 'acb-agent-settings';
-const CATALOG_KEY = 'acb-agent-threads';
+const CATALOG_KEY = 'acb-conversations';
 const MOCK_BASE = 'https://agent-e2e.invalid/v1';
 const HEAD = 'class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n';
 const WRONG = HEAD + '        cout << "n=" << nums.size() << endl;\n        for (int i = 0; i < nums.size(); i++)\n            for (int j = i; j < nums.size(); j++)\n                if (nums[i] + nums[j] == target) return {i, j};\n        return {};\n    }\n};';
@@ -273,14 +273,14 @@ try {
           const cat = (await chrome.storage.local.get('${CATALOG_KEY}'))['${CATALOG_KEY}'] ?? { conversations: [], selected: {} };
           const removed = cat.conversations.filter((c) => !keep.has(c.id)).map((c) => c.id);
           cat.conversations = cat.conversations.filter((c) => keep.has(c.id));
-          for (const [slug, id] of Object.entries(cat.selected)) {
+          for (const [key, id] of Object.entries(cat.selected)) {
             if (keep.has(id)) continue;
-            const next = cat.conversations.find((c) => c.slug === slug);
-            if (next) cat.selected[slug] = next.id;
-            else delete cat.selected[slug];
+            const next = cat.conversations.find((c) => c.key === key);
+            if (next) cat.selected[key] = next.id;
+            else delete cat.selected[key];
           }
           await chrome.storage.local.set({ '${CATALOG_KEY}': cat });
-          await chrome.storage.local.remove(removed.map((id) => 'acb-agent-thread:' + id));
+          await chrome.storage.local.remove(removed.map((id) => 'acb-conversation:' + id));
           return removed.length;
         });
       }`, panelId);

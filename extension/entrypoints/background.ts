@@ -1,5 +1,8 @@
+import type { ProblemInfo } from './content';
 import { ApiError, getProgress, postAttempt, putAttemptNote } from './lib/api';
 import { leetcodeSiteOf, type LeetCodeSite } from './lib/leetcode';
+import { readProblemPage, type PageReadResult } from './lib/page-readers';
+import { difficultyOf, problemOf, type ProblemHeader, type ProblemRef } from './lib/platforms';
 import { IDLE_MINUTES, MAX_BEAT_GAP_MS, type PauseReason, type TimerStatus } from './lib/timing';
 
 /**
@@ -74,6 +77,29 @@ const errText = (e: unknown) =>
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** 顶栏要的题号、标题、难度：力扣问内容脚本，其他平台在页面里读 */
+async function readHeader(tabId: number, problem: ProblemRef, url: string): Promise<ProblemHeader> {
+  if (problem.platform === 'leetcode') {
+    const info = await chrome.tabs.sendMessage(tabId, { type: 'GET_PROBLEM_INFO' }) as (ProblemInfo & { ok?: boolean }) | undefined;
+    if (!info?.ok) throw new Error('content script did not respond');
+    return {
+      ...problem, url, number: info.questionId,
+      title: info.translatedTitle || info.title || problem.id,
+      difficulty: difficultyOf('leetcode', info.difficultyCn),
+    };
+  }
+  const [injection] = await chrome.scripting.executeScript({
+    target: { tabId }, world: 'MAIN', func: readProblemPage, args: [problem.platform, problem.id],
+  });
+  const result = injection?.result as PageReadResult | undefined;
+  if (result && 'problem' in result) {
+    const { number, title, difficulty } = result.problem;
+    return { ...problem, url, number, title: title || problem.id, difficulty: difficultyOf(problem.platform, difficulty) };
+  }
+  if (!result || result.retry) throw new Error(result?.error ?? '读取题目失败');
+  return { ...problem, url, number: null, title: problem.id, difficulty: null };
+}
+
 async function postAttemptWithRetry(input: Parameters<typeof postAttempt>[0]) {
   const delays = [0, 750, 2_000];
   let lastError: unknown;
@@ -92,6 +118,13 @@ async function postAttemptWithRetry(input: Parameters<typeof postAttempt>[0]) {
 export default defineBackground(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
     console.error('setPanelBehavior failed:', err);
+  });
+
+  // 对话改成按「平台:题号」存储，旧格式的对话记录直接删掉
+  chrome.runtime.onInstalled.addListener(() => {
+    void chrome.storage.local.get(null).then((all) => chrome.storage.local.remove(
+      Object.keys(all).filter((key) => key === 'acb-agent-threads' || key.startsWith('acb-agent-thread:')),
+    ));
   });
 
   const getTimers = async (): Promise<Timers> =>
@@ -186,37 +219,23 @@ export default defineBackground(() => {
     const type = msg?.type;
 
     if (type === 'GET_PROBLEM_INFO') {
-      chrome.tabs.query({ active: true, lastFocusedWindow: true }, (tabs) => {
-        const tab = tabs[0];
+      void (async () => {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
         if (tab?.id == null) {
           sendResponse({ ok: false, error: 'no active tab' });
           return;
         }
-        const tabId = tab.id;
-        if (!leetcodeSiteOf(tab.url)) {
-          sendResponse({
-            ok: true,
-            isProblemPage: false,
-            url: tab.url ?? '',
-            slug: null,
-            title: null,
-            translatedTitle: null,
-            difficulty: null,
-            difficultyCn: null,
-            questionId: null,
-            source: 'url',
-          });
+        const problem = problemOf(tab.url);
+        if (!problem || !tab.url) {
+          sendResponse({ ok: true, problem: null });
           return;
         }
-        chrome.tabs.sendMessage(tabId, msg, (res) => {
-          const err = chrome.runtime.lastError;
-          if (err) {
-            sendResponse({ ok: false, error: err.message });
-          } else {
-            sendResponse(res ?? { ok: false, error: 'content script did not respond' });
-          }
-        });
-      });
+        try {
+          sendResponse({ ok: true, problem: await readHeader(tab.id, problem, tab.url) });
+        } catch (e) {
+          sendResponse({ ok: false, error: errText(e) });
+        }
+      })();
       return true;
     }
 

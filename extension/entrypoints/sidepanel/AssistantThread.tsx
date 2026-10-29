@@ -207,7 +207,7 @@ export default function AssistantThread(props: Props) {
               {canSend && <div className="aui-suggestions">
                 {SUGGESTIONS.map((item) => <button key={item.label} type="button" disabled={isRunning} onClick={() => suggest(item.prompt)}>{item.label}</button>)}
               </div>}
-            </> : <p>打开力扣题目，或在对话记录中选择对话</p>}
+            </> : <p>打开题目页面，或在对话记录中选择对话</p>}
           </div>}
           {activity && <p className="aui-status" role="status"><span className="aui-status-dot" />{activity}</p>}
           {error && <p className="aui-error" role="alert"><span>{error}</span>

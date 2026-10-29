@@ -58,7 +58,7 @@ try {
   writeFileSync(path.join(ARTIFACTS, 'panel-info-snapshot.txt'), snap);
   check('panel_shows_title', snap.includes('两数之和'), 'translatedTitle in panel');
   check('panel_shows_difficulty_cn', snap.includes('简单'), 'difficultyCn in panel');
-  check('panel_shows_question_id', snap.includes('StaticText "1. "'), 'questionId in panel');
+  check('panel_shows_question_id', snap.includes('StaticText "1. 两数之和"'), 'questionId and title in panel');
 
   const failed = results.filter((r) => !r.pass);
   writeFileSync(

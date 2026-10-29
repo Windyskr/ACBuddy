@@ -2,7 +2,7 @@
 
 ACBuddy 的浏览器插件：**WXT + React + TypeScript + Manifest V3 + Side Panel**。
 用户在力扣刷题时自动记录每次作答（结果/耗时/语言/提交 id）并收集心得，与
-ACBuddy 网站同步。
+ACBuddy 网站同步；在力扣、codefun2000 和牛客的题目页，侧边栏 AI 助手可以读题、读代码、标出错误行。
 
 ## 目录结构
 
@@ -17,6 +17,9 @@ extension/
 │   ├── content.ts                # content script（隔离世界）：读题、换题观察、提交结果心得卡
 │   ├── leetcode-hook.content.ts  # content script（MAIN world）：包住 fetch/XHR 截获力扣判题结果
 │   ├── lib/api.ts                # ACBuddy API client（面板与 background 共用）
+│   ├── lib/platforms.ts          # 支持的刷题网站：题目页地址规则、题目键、难度换算、哪些功能可用
+│   ├── lib/page-readers.ts       # 在 codefun2000、牛客页面里读题（MAIN world，chrome.scripting 注入）
+│   ├── lib/problem-text.ts       # 题面 HTML 转文字，拼出 AI 对话开头的题目信息
 │   └── sidepanel/                # Side Panel（登录态/题目/计时/进度与 AI 聊天）
 │       ├── index.html
 │       ├── main.tsx
@@ -25,25 +28,49 @@ extension/
 │   ├── mcp-client.mjs            # chrome-devtools-mcp 的 MCP JSON-RPC 客户端
 │   ├── test-auto-record.mjs      # ACBuddy 全链路 e2e（真实提交 AC + WA）
 │   ├── test-judge-result.mjs     # AI 工具 get_judge_result 的 e2e（真实运行，模拟模型）
+│   ├── test-platforms.mjs        # 多平台 e2e：codefun2000、牛客、力扣的顶栏、读题、读代码和标错
 │   └── test-login-guide.mjs      # 登录引导回归
 ├── .chrome-profile/              # Chrome 独立开发 Profile（chrome-devtools-mcp --user-data-dir，勿提交）
 └── .mcp-artifacts/               # 每轮测试的 snapshot/console 证据（勿提交）
 ```
 
+## 支持的网站
+
+| 平台 | 题目页 | 题目数据 | 代码框 | 功能 |
+| --- | --- | --- | --- | --- |
+| 力扣 | `leetcode.cn`、`leetcode.com` 的 `/problems/<slug>/…`（含比赛题） | 内容脚本：`__NEXT_DATA__` + GraphQL | 全局 `monaco` | AI 助手全部工具、自动记录、计时、心得卡 |
+| codefun2000 | `/ide/<P1559>`（`/p/<P1559>` 会跳过去，比赛题也是） | 页面变量 `UiContext.pdoc`，题面是 `content` 里 `ZhContent` 的 Markdown（样例写在里面） | 全局 `monaco` | AI 助手：读题、读代码、标错 |
+| 牛客 | `www.nowcoder.com/practice/<32 位 uuid>`（题库在线编程，核心代码模式和 ACM 模式） | Vuex `store.state`：`codingProblem`、`question`（HTML 题面、输入输出描述、多组样例）、`questionTags` | `window.__ncMonacoEditorApi.editor` | AI 助手：读题、读代码、标错 |
+
+- 平台在 `lib/platforms.ts` 登记，题目用题目键「平台:题号」标识（如 `leetcode:two-sum`、`codefun:P1559`、
+  `nowcoder:75e878df…`）。侧边栏、AI 的每一步检查和页面里的编辑器工具都用同一套地址规则，
+  `host_permissions` 要包含所有平台，否则拿不到标签页地址、也不能在页面里执行脚本（插件没有 `tabs` 权限）。
+- 新平台只在提问时用 `chrome.scripting.executeScript` 读页面里已经加载的数据，不另发请求（codefun2000 有防爬），
+  也不跑内容脚本。页面刚打开、刚切题时数据可能还没到，读题会每 0.5 秒重试，最多等 10 秒。
+- codefun2000 的 `pdoc` 里同时带着题解原文（`textSol`、`textSolHTML`），读题时排除；题面要登录才能看，没登录时顶栏照常显示，
+  新对话提示登录。
+- 牛客的全局 `monaco` 不是创建编辑器的那份（`getModels()` 为空），编辑器要从 `__ncMonacoEditorApi` 取；
+  没有 `setModelMarkers`，标错时只标红行、不显示悬停说明（说明在 AI 的回答里）。公式是 `/equation?tex=…` 图片，读题时还原成 `$…$`
+  （`alt` 里的 LaTeX 有时被截断，以地址里的 `tex` 参数为准）。地址里的 uuid 先写进 store、题目内容稍后才到，标题为空时按未加载重试。
+- 只认题库的在线编程页：牛客的笔试、考试页面和旧版 `questionTerminal` 页都不算题目页；ac.nowcoder.com（牛客竞赛，CodeMirror 5）还没接。
+- 自动记录、计时、心得卡、`get_history` 和 `get_judge_result` 目前只有力扣（`platforms.ts` 的 `tracked`）：
+  网站接口的 `PLATFORMS` 只有 leetcode，新平台的侧边栏不显示计时、进度和「未登录」提示。
+
 ## 消息链路
 
-Side Panel 挂载或切换标签页时自动同步 →
-`chrome.runtime.sendMessage` → background service worker（查询 active tab）
-→ `chrome.tabs.sendMessage` → content script 解析当前页面：URL slug（支持
-`/problems/<slug>/…` 与 `/contest/<name>/problems/<slug>/`）+ 页面 `__NEXT_DATA__`
-里的 dehydrated GraphQL 数据（标题/中文标题/难度/questionId）+ DOM 兜底，返回：
+Side Panel 挂载、切换标签页或当前标签页地址变化时自动同步 →
+`chrome.runtime.sendMessage({ type: 'GET_PROBLEM_INFO' })` → background service worker 查询 active tab，
+用 `problemOf(tab.url)` 判断平台和题号，再读顶栏要的题号、标题和难度：力扣转给 content script（URL slug 支持
+`/problems/<slug>/…` 与 `/contest/<name>/problems/<slug>/`，标题、难度来自页面 `__NEXT_DATA__` 里的 dehydrated
+GraphQL 数据，DOM 兜底），其他平台用 `readProblemPage` 在页面里读。返回：
 
 ```json
-{ "ok": true, "isProblemPage": true, "slug": "two-sum",
-  "title": "Two Sum", "translatedTitle": "两数之和",
-  "difficulty": "Easy", "difficultyCn": "简单",
-  "questionId": "1", "source": "next-data" }
+{ "ok": true, "problem": { "platform": "leetcode", "site": "leetcode.cn", "id": "two-sum", "key": "leetcode:two-sum",
+  "url": "https://leetcode.cn/problems/two-sum/", "number": "1", "title": "两数之和",
+  "difficulty": { "label": "简单", "tone": "easy" } } }
 ```
+
+不是题目页时 `problem` 为 `null`。
 
 已实测可读取的 leetcode.cn URL 形态：`/problems/<slug>/`、`/problems/<slug>/description/`、
 `/problems/<slug>/solutions/`、`/problems/<slug>/submissions/`（未登录也能取到题目信息；
@@ -142,9 +169,11 @@ LaTeX 公式使用 KaTeX 在本机渲染：行内公式写作 `$O(n \log n)$`，
 力扣「运行」的测试输入只在请求体里，钩子按用例数把各行平分给每个用例；运行时代码能跑完就回 `Accepted`，要看 `correct_answer` 判断答案对错。
 新对话打开时自动读取一次完整题干、示例和约束，保存为对话开头的题目信息。
 后续提问和重新打开面板时复用这份信息；每个新建对话各自加载一次题目。
-题目信息加载失败时可以重试，加载成功后才能提问。模型通过对话开头获取题目，工具列表提供代码、判题结果、历史和高亮操作。
+题目信息加载失败时可以重试，加载成功后才能提问。模型通过对话开头获取题目，工具列表提供代码、判题结果、历史和高亮操作；
+codefun2000、牛客只有读代码和高亮两类工具，系统提示也不提判题结果和历史。题目信息写明平台和答题模式（核心代码模式只写函数，
+ACM 模式要自己读输入、按格式输出），并带上标签、来源公司、时空限制和样例。
 每次提问绑定标签页和题目，切换标签页或页面导航时停止本次回答。
-对话记录按题目分组（当前题目在最前），每道题可以有多个对话。标题自动使用首次提问的内容。
+对话记录按题目键分组（当前题目在最前），每道题可以有多个对话，记录里存着平台和题目链接，「打开题目」直接用这个链接。标题自动使用首次提问的内容。
 对话使用独立编号保存在 `chrome.storage.local`，关闭面板或重启浏览器后仍然保留，同一道题的不同标签页共用对话列表。
 第一次打开题目时自动新建对话；再次进入时自动打开该题最近更新的对话，手动查看较早对话不会改变这个顺序。
 对话记录也可以查看其他题目的历史，输入框上方提供「打开题目」，打开对应题目后可以继续提问。
@@ -191,6 +220,7 @@ node tools/test-auto-record.mjs --site=leetcode.com   # 同上，在力扣国际
 node tools/test-login-guide.mjs    # 登录引导回归
 node tools/test-judge-result.mjs   # AI 读取判题结果：真实运行错误答案和编译错误代码，模型回复是模拟的（编辑器需为 C++）
 node tools/test-judge-result.mjs --submit   # 同上，再真实提交一次错误答案（记进本站的作答检查完删除）
+node tools/test-platforms.mjs      # 多平台：codefun2000（profile 需登录）、牛客两种答题模式、力扣的顶栏、读题、读代码和标错，模型回复是模拟的
 ```
 
 其他手动驱动工具：

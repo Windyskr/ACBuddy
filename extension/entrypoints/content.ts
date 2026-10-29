@@ -1,3 +1,4 @@
+import { htmlToText } from './lib/problem-text';
 import { BEAT_INTERVAL_MS } from './lib/timing';
 
 export interface ProblemInfo {
@@ -358,12 +359,9 @@ export default defineContentScript({
             const question = data?.data?.question;
             if (!response.ok || !question) throw new Error('无法获取完整题干，请确认题目可以正常访问');
             if (slugFromUrl(location.pathname) !== info.slug) throw new Error('题目已经切换，请重新提问');
-            const doc = new DOMParser().parseFromString(question.translatedContent || question.content || '', 'text/html');
-            doc.querySelectorAll('script, style').forEach((element) => element.remove());
-            doc.querySelectorAll('p, div, pre, li, br').forEach((element) => element.append('\n'));
-            const description = doc.body.textContent?.trim() ?? '';
+            const description = htmlToText(question.translatedContent || question.content || '');
             if (!description) throw new Error('当前题目没有可读取的题干');
-            sendResponse({ ok: true, ...info, title: question.translatedTitle || question.title, description: description.slice(0, 40000) });
+            sendResponse({ ok: true, ...info, title: question.translatedTitle || question.title, description });
           } catch (error) {
             sendResponse({ ok: false, error: error instanceof Error ? error.message : '读取题干失败' });
           }

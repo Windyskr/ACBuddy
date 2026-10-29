@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ProblemInfo } from '../content';
 import { getMe, getProgress, openSite, type Progress } from '../lib/api';
+import { PLATFORMS, problemLabel, type ProblemHeader } from '../lib/platforms';
 import { IDLE_MINUTES, type TimerStatus } from '../lib/timing';
 import AgentChat from './AgentChat';
 import { PauseIcon, PlayIcon, RestartIcon } from './icons';
@@ -8,23 +8,24 @@ import './panel.css';
 
 const fmt = (s: number) =>
   `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-const DIFFICULTY_TONE: Record<string, string> = { 简单: 'easy', 中等: 'medium', 困难: 'hard' };
 const MASTERY_LABEL = ['未做', '了解', '一般', '掌握', '熟练', '精通'];
 
 type PageState = 'loading' | 'problem' | 'other' | 'error';
 type Toast = { text: string; tone: 'pass' | 'fail' | 'info' };
 type Timer = TimerStatus & { at: number };
+// 计时、进度和自动记录只有力扣有（按 slug 存）；其他平台的题返回 null
+const trackedSlug = (problem: ProblemHeader | null) => (problem && PLATFORMS[problem.platform].tracked ? problem.id : null);
 
 export default function App() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [me, setMe] = useState<string | null | undefined>(undefined);
   const [page, setPage] = useState<PageState>('loading');
   const [pageError, setPageError] = useState('');
-  const [problem, setProblem] = useState<ProblemInfo | null>(null);
+  const [problem, setProblem] = useState<ProblemHeader | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [timer, setTimer] = useState<Timer | null>(null);
   const [, setTick] = useState(0);
-  const problemRef = useRef<ProblemInfo | null>(null);
+  const problemRef = useRef<ProblemHeader | null>(null);
   const retryTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -40,8 +41,13 @@ export default function App() {
       refreshMe();
       fetchProblem();
     };
+    // 页面内切题（地址变了、没有整页加载）也要刷新顶栏
+    const onUpdated = (_tabId: number, change: { url?: string }, tab: chrome.tabs.Tab) => {
+      if (change.url && tab.active) fetchProblem();
+    };
     window.addEventListener('focus', sync);
     chrome.tabs.onActivated.addListener(sync);
+    chrome.tabs.onUpdated.addListener(onUpdated);
     const onBg = (msg: { type?: string; slug?: string; result?: string }) => {
       if (msg.type === 'PROBLEM_CHANGED') {
         fetchProblem();
@@ -55,8 +61,8 @@ export default function App() {
         setToast(msg.result === 'pass'
           ? { text: '已记录：通过 ✓', tone: 'pass' }
           : { text: '已记录：未通过 ✗', tone: 'fail' });
-        if (msg.slug && problemRef.current?.slug === msg.slug) void loadProgress(msg.slug);
-      } else if (msg.type === 'NOTE_SAVED' && msg.slug && problemRef.current?.slug === msg.slug) {
+        if (msg.slug && trackedSlug(problemRef.current) === msg.slug) void loadProgress(msg.slug);
+      } else if (msg.type === 'NOTE_SAVED' && msg.slug && trackedSlug(problemRef.current) === msg.slug) {
         setToast({ text: '心得已保存', tone: 'info' });
         void loadProgress(msg.slug);
       }
@@ -65,6 +71,7 @@ export default function App() {
     return () => {
       window.removeEventListener('focus', sync);
       chrome.tabs.onActivated.removeListener(sync);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
       chrome.runtime.onMessage.removeListener(onBg);
     };
   }, []);
@@ -75,8 +82,9 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  const timerSlug = trackedSlug(problem);
   useEffect(() => {
-    const slug = problem?.slug;
+    const slug = timerSlug;
     if (slug == null) return;
     let ticks = 0;
     const t = setInterval(() => {
@@ -85,12 +93,12 @@ export default function App() {
       else setTick(ticks);
     }, 1000);
     return () => clearInterval(t);
-  }, [problem?.slug]);
+  }, [timerSlug]);
 
   useEffect(() => {
     let lastSent = 0;
     const onActivity = () => {
-      const slug = problemRef.current?.slug;
+      const slug = trackedSlug(problemRef.current);
       if (!slug || Date.now() - lastSent < 10_000) return;
       lastSent = Date.now();
       chrome.runtime.sendMessage({ type: 'PANEL_ACTIVITY', slug }, () => void chrome.runtime.lastError);
@@ -103,7 +111,7 @@ export default function App() {
   }, []);
 
   const applyTimer = (status: TimerStatus) => {
-    if (status.slug && status.slug === problemRef.current?.slug) setTimer({ ...status, at: Date.now() });
+    if (status.slug && status.slug === trackedSlug(problemRef.current)) setTimer({ ...status, at: Date.now() });
   };
   const loadTimer = (slug: string) => {
     chrome.runtime.sendMessage({ type: 'GET_TIMER', slug }, (res) => {
@@ -111,7 +119,7 @@ export default function App() {
     });
   };
   const controlTimer = (action: 'pause' | 'resume' | 'restart') => {
-    const slug = problemRef.current?.slug;
+    const slug = trackedSlug(problemRef.current);
     if (!slug) return;
     chrome.runtime.sendMessage({ type: 'TIMER_CONTROL', slug, action }, (res) => {
       if (!chrome.runtime.lastError && res?.ok) applyTimer(res as TimerStatus);
@@ -134,7 +142,7 @@ export default function App() {
     }
     chrome.runtime.sendMessage({ type: 'GET_PROBLEM_INFO' }, (res: unknown) => {
       const err = chrome.runtime.lastError;
-      const p = err ? null : (res as ({ ok: boolean; error?: string } & ProblemInfo) | null);
+      const p = err ? null : (res as { ok: boolean; error?: string; problem?: ProblemHeader | null } | null);
       if (err || !p?.ok) {
         if (retriesLeft > 0) {
           retryTimerRef.current = window.setTimeout(() => fetchProblem(retriesLeft - 1), 2000);
@@ -147,13 +155,17 @@ export default function App() {
         setPageError(err?.message ?? p?.error ?? '');
         return;
       }
-      if (p.isProblemPage && p.slug) {
-        if (problemRef.current?.slug !== p.slug) setTimer(null);
-        setProblem(p);
-        problemRef.current = p;
+      if (p.problem) {
+        const next = p.problem;
+        if (problemRef.current?.key !== next.key) setTimer(null);
+        setProblem(next);
+        problemRef.current = next;
         setPage('problem');
-        loadTimer(p.slug);
-        void loadProgress(p.slug);
+        const slug = trackedSlug(next);
+        if (slug) {
+          loadTimer(slug);
+          void loadProgress(slug);
+        } else setProgress(null);
       } else {
         setProblem(null);
         problemRef.current = null;
@@ -163,7 +175,8 @@ export default function App() {
     });
   };
 
-  const problemTitle = problem && (problem.translatedTitle ?? problem.title ?? problem.slug);
+  const problemTitle = problem && problemLabel(problem.number, problem.title);
+  const tracked = !!timerSlug;
   const paused = timer?.paused ?? null;
   const seconds = timer ? Math.floor((timer.elapsedMs + (paused ? 0 : Date.now() - timer.at)) / 1000) : 0;
   const timerTip = paused === 'manual' ? '已手动暂停：点继续，或在编辑器里改代码时自动继续'
@@ -174,23 +187,22 @@ export default function App() {
   const header = <>
     {problem ? (
       <div className="panel-problem">
-        <span className="panel-problem-title" title={`${problem.questionId != null ? `${problem.questionId}. ` : ''}${problemTitle}`}>
-          {problem.questionId != null ? `${problem.questionId}. ` : ''}
-          {problemTitle}
-        </span>
-        {problem.difficultyCn && <span className={`badge badge-${DIFFICULTY_TONE[problem.difficultyCn] ?? 'muted'}`}>{problem.difficultyCn}</span>}
+        <span className="panel-problem-title" title={problemTitle ?? undefined}>{problemTitle}</span>
+        {problem.difficulty && (
+          <span className={`badge${problem.difficulty.tone ? ` badge-${problem.difficulty.tone}` : ''}`}>{problem.difficulty.label}</span>
+        )}
       </div>
     ) : (
       <div className="panel-problem panel-problem-empty" title={page === 'error' ? pageError : undefined}>
-        {page === 'loading' ? '正在读取题目…' : page === 'error' ? '无法读取题目，请刷新力扣页面' : '未打开力扣题目'}
+        {page === 'loading' ? '正在读取题目…' : page === 'error' ? '无法读取题目，请刷新题目页面' : '未打开题目页面'}
       </div>
     )}
-    {me === null ? (
+    {me === null && (!problem || tracked) ? (
       <p className="panel-banner">
         <span>未登录，作答不会被记录</span>
         <button type="button" onClick={() => openSite()}>去网站登录</button>
       </p>
-    ) : problem && me && (
+    ) : problem && me && tracked && (
       <div className="panel-meta">
         <span className="panel-timer" title={timerTip}>
           {paused === 'done' ? '计时已停' : <>{paused ? '已暂停' : '计时'} <b className={paused ? 'is-paused' : undefined}>{fmt(seconds)}</b></>}
@@ -222,7 +234,7 @@ export default function App() {
 
   return (
     <main className="app">
-      <AgentChat slug={problem?.slug ?? null} account={me} header={header} />
+      <AgentChat problemKey={problem?.key ?? null} account={me} header={header} />
     </main>
   );
 }
