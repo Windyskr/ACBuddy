@@ -14,6 +14,9 @@ import { ExternalLinkIcon, HistoryIcon, PlusIcon, SettingsIcon, TrashIcon } from
 
 const emptySettings: AgentSettings = { baseUrl: '', model: '', apiKey: '' };
 type Target = { tabId: number; problem: ProblemRef };
+// 进行中的回答按对话记下：切到别的标签页或对话时在后台继续、照常保存，切回这个对话时接着显示。
+// done 之后留到最后一次保存写完，免得这期间打开对话读到旧记录
+type Run = { abort: AbortController; messages: AgentMessage[]; activity: string; done: boolean };
 
 const timeLabel = (value: number) => {
   const date = new Date(value);
@@ -43,7 +46,9 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
   const [error, setError] = useState('');
   const [settingsStatus, setSettingsStatus] = useState('');
   const [saving, setSaving] = useState(false);
-  const controller = useRef<AbortController | null>(null);
+  const runs = useRef(new Map<string, Run>());
+  // 后台回答出错时对话不在显示，错误留到打开这个对话时再显示
+  const failures = useRef(new Map<string, string>());
   const history = useRef<AgentMessage[]>([]);
   const composerDraft = useRef('');
   const selectedRef = useRef<Conversation | null>(null);
@@ -54,7 +59,6 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
   const pendingSave = useRef<Promise<void>>(Promise.resolve());
 
   const beginView = useCallback(() => {
-    controller.current?.abort(); controller.current = null;
     const ticket = ++version.current;
     if (selectedRef.current) composerDraft.current = '';
     selectedRef.current = null; history.current = [];
@@ -70,12 +74,17 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
       if (!mounted.current || ticket !== version.current) return;
       const record = await load();
       if (!mounted.current || ticket !== version.current) return;
-      selectedRef.current = record; history.current = record?.messages ?? [];
+      const run = record ? runs.current.get(record.id) : undefined;
+      const running = !!run && !run.done;
+      selectedRef.current = record; history.current = run?.messages ?? record?.messages ?? [];
       setConversation(record); setMessages(history.current);
+      setBusy(running); setActivity(running ? run.activity : '');
+      const failure = record && failures.current.get(record.id);
+      if (failure) { failures.current.delete(record.id); setError(failure); }
     } catch (reason) {
-      if (mounted.current && ticket === version.current) setError(reason instanceof Error ? reason.message : '加载对话失败');
+      if (mounted.current && ticket === version.current) { setError(reason instanceof Error ? reason.message : '加载对话失败'); setActivity(''); }
     } finally {
-      if (mounted.current && ticket === version.current) { setLoading(false); setActivity(''); }
+      if (mounted.current && ticket === version.current) setLoading(false);
     }
   }, [beginView]);
 
@@ -88,6 +97,8 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
       catalogChanged = true;
       const value = next ?? { conversations: [], selected: {} };
       setCatalog(value);
+      // 对话删掉了（包括在别的窗口删的），停掉它的回答
+      for (const [id, run] of runs.current) if (!value.conversations.some((item) => item.id === id)) run.abort.abort();
       if (selectedRef.current && !value.conversations.some((item) => item.id === selectedRef.current?.id)) {
         beginView(); setLoading(false); setActivity('');
       }
@@ -106,7 +117,7 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
     })();
     return () => {
       mounted.current = false; ++version.current; ++targetQuery.current;
-      controller.current?.abort();
+      for (const run of runs.current.values()) run.abort.abort();
       chrome.storage.onChanged.removeListener(onStorage);
     };
   }, [beginView]);
@@ -121,10 +132,9 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
       if (targetRef.current?.tabId === next?.tabId && targetRef.current?.problem.key === next?.problem.key) return;
       targetRef.current = next; setTarget(next);
       if (next) await openView(() => openProblemConversation(next.tabId, next.problem));
-      else {
-        ++version.current; controller.current?.abort(); controller.current = null;
-        history.current = completedMessages(history.current); setMessages(history.current);
-        setBusy(false); setLoading(false); setActivity('');
+      else if (!selectedRef.current) {
+        // 离开题目页面：作废还在加载的对话；已经打开的对话留着，回答照常进行
+        ++version.current; setLoading(false); setActivity('');
       }
     } catch (reason) {
       if (mounted.current && query === targetQuery.current) setError(reason instanceof Error ? reason.message : '读取当前题目失败');
@@ -216,34 +226,41 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
       throw new MessageNotSentError('请先配置模型服务');
     }
     const id = conversation.id;
-    const ticket = version.current;
     const next: AgentMessage[] = [...completedMessages(history.current), { role: 'user', content: text.trim() }];
     if (JSON.stringify(next).length > 200000) {
       setError('对话内容过长，请新建对话后继续提问');
       throw new MessageNotSentError('对话内容过长');
     }
-    const abort = new AbortController(); controller.current = abort;
+    const run: Run = { abort: new AbortController(), messages: next, activity: '正在思考…', done: false };
+    const { signal } = run.abort;
+    runs.current.set(id, run); failures.current.delete(id);
     history.current = next; setMessages(next); persist(id, next);
-    setBusy(true); setError(''); setActivity('正在思考…');
-    const isCurrent = () => mounted.current && ticket === version.current && controller.current === abort;
+    setBusy(true); setError(''); setActivity(run.activity);
+    const showing = () => mounted.current && selectedRef.current?.id === id;
+    const show = (activity: string) => {
+      run.activity = activity;
+      if (showing()) { history.current = run.messages; setMessages(run.messages); setActivity(activity); }
+    };
     try {
       await runAgent({
-        settings, tabId: target.tabId, problem: target.problem, messages: next, signal: abort.signal,
+        settings, tabId: target.tabId, problem: target.problem, messages: next, signal,
         onMessage(message) {
-          if (!isCurrent() || abort.signal.aborted) return;
-          history.current = [...history.current, message];
-          setMessages(history.current); setActivity('正在思考…');
-          persist(id, completedMessages(history.current));
+          if (signal.aborted) return;
+          run.messages = [...run.messages, message];
+          persist(id, completedMessages(run.messages));
+          show('正在思考…');
         },
-        onTool(name) { if (isCurrent() && !abort.signal.aborted) setActivity(`${name}…`); },
+        onTool(name) { if (!signal.aborted) show(`${name}…`); },
       });
     } catch (reason) {
-      if (isCurrent()) setError(abort.signal.aborted ? '本次回答已停止' : reason instanceof Error ? reason.message : '请求失败');
+      const message = signal.aborted ? '本次回答已停止' : reason instanceof Error ? reason.message : '请求失败';
+      if (showing()) setError(message);
+      else if (!signal.aborted) failures.current.set(id, message);
     } finally {
-      if (isCurrent()) {
-        history.current = completedMessages(history.current); setMessages(history.current); persist(id, history.current);
-        setBusy(false); setActivity(''); controller.current = null;
-      }
+      run.messages = completedMessages(run.messages); run.done = true;
+      persist(id, run.messages);
+      void pendingSave.current.then(() => { if (runs.current.get(id) === run) runs.current.delete(id); });
+      if (showing()) { history.current = run.messages; setMessages(run.messages); setBusy(false); setActivity(''); }
     }
   };
 
@@ -271,7 +288,7 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
       messages={messages} isRunning={busy} isLoading={loading} canSend={canSend}
       hint={hint} hintAction={hintAction} initialDraft={composerDraft.current}
       onDraftChange={(text) => { composerDraft.current = text; }}
-      activity={activity} error={error} errorAction={errorAction} onSend={send} onCancel={() => controller.current?.abort()} />
+      activity={activity} error={error} errorAction={errorAction} onSend={send} onCancel={() => runs.current.get(selectedRef.current?.id ?? '')?.abort.abort()} />
     <Sheet open={showHistory} title={`对话记录（${catalog.conversations.length}）`} onClose={closeHistory}>
       <nav aria-label="按题目查看对话">
         {groups.map((group) => <section key={group.key} className="history-group" aria-label={group.conversations[0]?.problemTitle}>

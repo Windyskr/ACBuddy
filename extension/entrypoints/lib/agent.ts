@@ -84,15 +84,14 @@ export async function runAgent(input: {
   const messages = [...input.messages];
   if (messages[0]?.kind !== 'problem') throw new Error('题目信息尚未加载，请重新打开对话');
   let snapshot: { code: string; uri: string } | null = null;
-  const ensureTarget = async () => {
-    signal.throwIfAborted();
-    const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (active?.id !== tabId) throw new Error('活动标签页已经切换，请回到原题后重新提问');
-    if (problemOf(active.url)?.key !== problem.key) throw new Error('题目已经切换，请重新提问');
+  // 回答不跟着活动标签页走：用户切到别的标签页时照常进行。页面工具只操作提问时的标签页，它关了或换了题就报错给模型
+  const ensureTab = async () => {
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (!tab) throw new Error('题目页面已经关闭');
+    if (problemOf(tab.url)?.key !== problem.key) throw new Error('题目已经切换，请重新提问');
     signal.throwIfAborted();
   };
   const execute = async (call: ToolCall) => {
-    await ensureTarget();
     const args = JSON.parse(call.function.arguments || '{}');
     if (!available.has(call.function.name)) throw new Error('当前平台不支持这个工具');
     switch (call.function.name) {
@@ -108,6 +107,7 @@ export async function runAgent(input: {
       case 'get_judge_result':
       case 'highlight_errors':
       case 'clear_highlights': {
+        await ensureTab();
         const action = editorActions[call.function.name];
         const [result] = await chrome.scripting.executeScript({
           target: { tabId }, world: 'MAIN', func: editorTool, args: [pathGuard(problem), action, snapshot, args?.ranges ?? []],
@@ -124,7 +124,7 @@ export async function runAgent(input: {
   const append = (message: AgentMessage) => { messages.push(message); input.onMessage(message); };
   let remainingTools = 24;
   for (let step = 0; step < 12; step++) {
-    await ensureTarget();
+    signal.throwIfAborted();
     const timeout = AbortSignal.timeout(90000);
     const response = await fetch(endpointFor(settings.baseUrl, settings.apiType), {
       method: 'POST', credentials: 'omit', redirect: 'error',
@@ -134,7 +134,7 @@ export async function runAgent(input: {
     });
     if (!response.ok) throw new Error(`模型请求失败（HTTP ${response.status}），请检查 API 地址、密钥、模型和工具调用支持`);
     const body = await response.json();
-    await ensureTarget();
+    signal.throwIfAborted();
     const reply = modelReply(body, settings.apiType);
     const calls: ToolCall[] = reply.tool_calls ?? [];
     if (calls.length > remainingTools) throw new Error('工具调用次数达到上限，请继续提问');
