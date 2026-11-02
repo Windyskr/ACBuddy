@@ -12,6 +12,12 @@
  * - POST   /api/attempts                      上报一次作答（带 site，服务端据此推出 platform）
  * - GET    /api/attempts?limit=50             最近作答
  * - PUT / DELETE /api/attempts/:id           补写心得 / 删除一条作答
+ * - GET    /api/memories?since=&after=        取变化的长期记忆（含已删除的），按 (updatedAt, id) 翻页，每页最多 200 条
+ * - POST   /api/memories/sync {put, remove}   上传记忆的新增、修改和删除，一次最多 20 条
+ * - DELETE /api/memories                      清空全部记忆，留一条 "__cleared__" 标记告诉其他设备
+ *
+ * 长期记忆只有记忆本身跟随账号同步，对话和记忆引用的用户原话都不上传。同一条记忆后写的覆盖先写的，
+ * 但删除优先：已删除的 id 不能再写回来，否则离线设备上的旧改动会让删掉的记忆复活。
  *
  * 两种笔记，互不同步：
  * - progress.note：题目当前笔记，只由 PUT /api/progress/:platform/:slug 修改（"" 表示清除）
@@ -260,6 +266,10 @@ const RATE_LIMITS = {
   loginByUser: { limit: 8, windowSec: 600 } satisfies RateRule,
   password: { limit: 10, windowSec: 600 } satisfies RateRule,
   write: { limit: 1200, windowSec: 3600 } satisfies RateRule,
+  // 一个账号每天最多同步 100 次（2000 条），正常使用远远用不到。不设这个上限，
+  // 一个账号就可能用掉全站每天 10 万行的写入额度
+  memorySync: { limit: 100, windowSec: 86_400 } satisfies RateRule,
+  memoryClear: { limit: 5, windowSec: 86_400 } satisfies RateRule,
 };
 
 function clientIp(request: Request): string {
@@ -322,12 +332,97 @@ function rateLimited(retryAfter: number, request: Request, env: Env): Response {
 const QUOTAS = {
   progressRows: 4000,
   attemptRows: 20_000,
+  // 含已删除的行。清空时这些行也一起删掉，所以不会卡死
+  memoryRows: 5000,
 };
+
+const MEMORY_PAGE = 200;
+const MEMORY_BATCH = 20;
+const MEMORY_CLEARED_ID = "__cleared__";
+const MEMORY_TYPES = new Set(["semantic", "episodic", "procedural"]);
+
+interface MemoryRow {
+  id: string;
+  type: string;
+  text: string;
+  concepts: string;
+  problem_key: string | null;
+  importance: number;
+  attempt_ids: string;
+  sources: string;
+  valid_from: number;
+  invalid_at: number | null;
+  created_at: number;
+  superseded_by: string | null;
+  updated_at: number;
+  deleted: number;
+}
+
+interface MemoryInput {
+  id: string;
+  type: string;
+  text: string;
+  concepts: string[];
+  problemKey: string | null;
+  importance: number;
+  attemptIds: number[];
+  sources: string[];
+  validFrom: number;
+  invalidAt: number | null;
+  createdAt: number;
+  supersededBy: string | null;
+}
+
+function serializeMemory(row: MemoryRow) {
+  return {
+    id: row.id,
+    type: row.type,
+    text: row.text,
+    concepts: JSON.parse(row.concepts) as string[],
+    problemKey: row.problem_key,
+    importance: row.importance,
+    attemptIds: JSON.parse(row.attempt_ids) as number[],
+    sources: JSON.parse(row.sources) as string[],
+    validFrom: row.valid_from,
+    invalidAt: row.invalid_at,
+    createdAt: row.created_at,
+    supersededBy: row.superseded_by,
+    updatedAt: row.updated_at,
+    deleted: row.deleted === 1,
+  };
+}
+
+const isMemoryId = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0 && value.length <= 120 && value !== MEMORY_CLEARED_ID && !/[\x00-\x1f]/.test(value);
+const isTime = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+const isShortStrings = (value: unknown, maxItems: number, maxLength: number): value is string[] =>
+  Array.isArray(value) && value.length <= maxItems && value.every((item) => typeof item === "string" && item.length <= maxLength);
+
+/** 字段严格校验，多余的字段不写库：对话内容和用户原话不能夹带进来 */
+function parseMemoryInput(value: unknown): MemoryInput | null {
+  if (value === null || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  if (!isMemoryId(item.id) || !MEMORY_TYPES.has(item.type as string)) return null;
+  if (typeof item.text !== "string" || !item.text.trim() || item.text.length > 1000) return null;
+  if (!isShortStrings(item.concepts, 30, 40) || !isShortStrings(item.sources, 100, 120)) return null;
+  if (!Array.isArray(item.attemptIds) || item.attemptIds.length > 100 || !item.attemptIds.every((id) => Number.isSafeInteger(id))) return null;
+  if (typeof item.importance !== "number" || !Number.isInteger(item.importance) || item.importance < 1 || item.importance > 5) return null;
+  if (!isTime(item.validFrom) || !isTime(item.createdAt)) return null;
+  if (item.invalidAt !== null && !isTime(item.invalidAt)) return null;
+  if (item.supersededBy !== null && !isMemoryId(item.supersededBy)) return null;
+  if (item.problemKey !== null && (typeof item.problemKey !== "string" || item.problemKey.length > 200)) return null;
+  return {
+    id: item.id, type: item.type as string, text: item.text, concepts: item.concepts, problemKey: item.problemKey,
+    importance: item.importance, attemptIds: item.attemptIds as number[], sources: item.sources,
+    validFrom: item.validFrom, invalidAt: item.invalidAt, createdAt: item.createdAt, supersededBy: item.supersededBy,
+  };
+}
 
 /** 用 `LIMIT ?` 子查询把读取行数卡在上限 +1，避免 COUNT(*) 扫全部行（D1 按读取行数计费） */
 async function isOverQuota(
   env: Env,
-  table: "progress" | "attempts",
+  table: "progress" | "attempts" | "memories",
   userId: number,
   max: number,
 ): Promise<boolean> {
@@ -763,6 +858,89 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         request,
         env,
       );
+    }
+
+    if (resource === "memories" && !sub && request.method === "GET") {
+      const since = Number(url.searchParams.get("since") ?? "0");
+      const after = url.searchParams.get("after") ?? "";
+      if (!isTime(since) || after.length > 120) return fail(400, "since 或 after 无效", request, env);
+      const { results } = await env.DB
+        .prepare(
+          `SELECT * FROM memories WHERE user_id = ?1 AND (updated_at, id) > (?2, ?3)
+           ORDER BY updated_at, id LIMIT ?4`,
+        )
+        .bind(user.id, since, after, MEMORY_PAGE + 1)
+        .all<MemoryRow>();
+      return json(
+        { ok: true, data: { memories: results.slice(0, MEMORY_PAGE).map(serializeMemory), more: results.length > MEMORY_PAGE } },
+        request,
+        env,
+      );
+    }
+
+    if (resource === "memories" && sub === "sync" && !third && request.method === "POST") {
+      const body = await readJsonObject(request);
+      const put = Array.isArray(body?.put) ? body.put : [];
+      const remove = Array.isArray(body?.remove) ? body.remove : [];
+      if (!body || (body.put !== undefined && !Array.isArray(body.put)) || (body.remove !== undefined && !Array.isArray(body.remove))) {
+        return fail(400, "请求内容无效", request, env);
+      }
+      if (put.length + remove.length > MEMORY_BATCH) return fail(400, `一次最多同步 ${MEMORY_BATCH} 条`, request, env);
+      const records = put.map(parseMemoryInput);
+      if (records.some((record) => record === null) || !remove.every(isMemoryId)) return fail(400, "记忆内容无效", request, env);
+      if (!records.length && !remove.length) return json({ ok: true, data: { updatedAt: Date.now() } }, request, env);
+
+      const gate = await enforceRateLimit(env, `memory-sync:${user.id}`, RATE_LIMITS.memorySync);
+      if (!gate.allowed) return rateLimited(gate.retryAfter, request, env);
+      if (records.length && await isOverQuota(env, "memories", user.id, QUOTAS.memoryRows)) {
+        return fail(413, "记忆太多了，请清理后再同步", request, env);
+      }
+
+      const now = Date.now();
+      await env.DB.batch([
+        ...(records as MemoryInput[]).map((record) => env.DB
+          .prepare(
+            `INSERT INTO memories (user_id, id, type, text, concepts, problem_key, importance, attempt_ids, sources, valid_from, invalid_at, created_at, superseded_by, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+             ON CONFLICT(user_id, id) DO UPDATE SET
+               type = excluded.type, text = excluded.text, concepts = excluded.concepts, problem_key = excluded.problem_key,
+               importance = excluded.importance, attempt_ids = excluded.attempt_ids, sources = excluded.sources,
+               valid_from = excluded.valid_from, invalid_at = excluded.invalid_at, created_at = excluded.created_at,
+               superseded_by = excluded.superseded_by, updated_at = excluded.updated_at
+             WHERE memories.deleted = 0`,
+          )
+          .bind(
+            user.id, record.id, record.type, record.text, JSON.stringify(record.concepts), record.problemKey, record.importance,
+            JSON.stringify(record.attemptIds), JSON.stringify(record.sources), record.validFrom, record.invalidAt, record.createdAt, record.supersededBy, now,
+          )),
+        // 内容马上清空，这一行只用来告诉其他设备；没同步过的 id 也留一行，其他设备可能已经有了
+        ...(remove as string[]).map((id) => env.DB
+          .prepare(
+            `INSERT INTO memories (user_id, id, type, text, valid_from, created_at, updated_at, deleted)
+             VALUES (?1, ?2, 'episodic', '', 0, 0, ?3, 1)
+             ON CONFLICT(user_id, id) DO UPDATE SET
+               type = 'episodic', text = '', concepts = '[]', problem_key = NULL, importance = 3, attempt_ids = '[]', sources = '[]',
+               valid_from = 0, invalid_at = NULL, created_at = 0, superseded_by = NULL, updated_at = ?3, deleted = 1`,
+          )
+          .bind(user.id, id, now)),
+      ]);
+      return json({ ok: true, data: { updatedAt: now } }, request, env);
+    }
+
+    if (resource === "memories" && !sub && request.method === "DELETE") {
+      const gate = await enforceRateLimit(env, `memory-clear:${user.id}`, RATE_LIMITS.memoryClear);
+      if (!gate.allowed) return rateLimited(gate.retryAfter, request, env);
+      const now = Date.now();
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM memories WHERE user_id = ?1").bind(user.id),
+        env.DB
+          .prepare(
+            `INSERT INTO memories (user_id, id, type, text, valid_from, created_at, updated_at, deleted)
+             VALUES (?1, ?2, 'episodic', '', ?3, ?3, ?3, 1)`,
+          )
+          .bind(user.id, MEMORY_CLEARED_ID, now),
+      ]);
+      return json({ ok: true, data: { clearedAt: now } }, request, env);
     }
 
     return fail(404, `未知接口：${request.method} /api/${segments.join("/")}`, request, env);
