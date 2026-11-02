@@ -3,3 +3,6 @@ node_modules
 .wxt
 .mcp-artifacts
 .chrome-profile
+eval/.cache
+eval/embed/node_modules
+eval/embed/package-lock.json

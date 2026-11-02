@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionBarPrimitive, AssistantRuntimeProvider, ComposerPrimitive, MessagePrimitive, ThreadPrimitive,
-  useExternalStoreRuntime, type AppendMessage, type ThreadMessageLike, type ToolCallMessagePartProps,
+  useAuiState, useExternalStoreRuntime, type AppendMessage, type ThreadMessageLike, type ToolCallMessagePartProps,
 } from '@assistant-ui/react';
 import { MarkdownTextPrimitive, type CodeHeaderProps, type SyntaxHighlighterProps } from '@assistant-ui/react-markdown';
 import PrismLight from 'react-syntax-highlighter/dist/esm/prism-light';
@@ -21,8 +21,8 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { toolLabels, type AgentMessage } from '../lib/agent';
-import { ArrowDownIcon, CheckIcon, CopyIcon, SendIcon, StopIcon } from './icons';
+import { toolLabels, type AgentMessage, type RunTrace } from '../lib/agent';
+import { ArrowDownIcon, CheckIcon, CopyIcon, GaugeIcon, MemoryIcon, SendIcon, StopIcon } from './icons';
 import './assistant-thread.css';
 
 for (const [name, language] of Object.entries({ javascript, typescript, cpp, c, python, java, go, rust, json, bash })) {
@@ -44,16 +44,19 @@ function readJSON(text: string | null): unknown {
 function displayMessages(messages: AgentMessage[], conversationId: string, ids: WeakMap<AgentMessage, string>, running: boolean): ThreadMessageLike[] {
   const results = new Map(messages.filter((message) => message.role === 'tool')
     .map((message) => [message.tool_call_id, readJSON(message.content)]));
-  const output: { id: string; role: 'user' | 'assistant'; content: ContentPart[] }[] = [];
+  const output: { id: string; role: 'user' | 'assistant'; content: ContentPart[]; metadata: { custom: { usedMemories?: AgentMessage['usedMemories']; trace?: RunTrace } } }[] = [];
+  let usedMemories: AgentMessage['usedMemories'];
   messages.forEach((message) => {
-    if (message.kind === 'problem' || message.role === 'tool') return;
+    if (message.kind || message.role === 'tool') return;
+    if (message.role === 'user') usedMemories = message.usedMemories;
     let item = output.at(-1);
     if (message.role === 'user' || item?.role !== 'assistant') {
       let id = ids.get(message);
       if (!id) { id = `${conversationId}:${crypto.randomUUID()}`; ids.set(message, id); }
-      item = { id, role: message.role, content: [] };
+      item = { id, role: message.role, content: [], metadata: { custom: message.role === 'assistant' && usedMemories?.length ? { usedMemories } : {} } };
       output.push(item);
     }
+    if (message.trace) item.metadata.custom.trace = message.trace;
     if (message.content) item.content.push({ type: 'text', text: message.content });
     for (const call of message.tool_calls ?? []) {
       const result = results.get(call.id);
@@ -101,6 +104,9 @@ function resultText(result: unknown): string {
   if ('code' in result) return `${'language' in result ? `语言：${result.language}\n\n` : ''}${result.code}`;
   if ('highlighted' in result) return `已标记 ${result.highlighted} 处错误`;
   if ('cleared' in result) return '已清除错误标记';
+  if ('memories' in result && Array.isArray(result.memories)) {
+    return result.memories.map((memory) => `${memory.time}${memory.noLongerTrueSince ? `（${memory.noLongerTrueSince} 起不再成立）` : ''} ${memory.text}`).join('\n') || '没有找到相关记忆';
+  }
   if ('attempts' in result && Array.isArray(result.attempts)) {
     const note = 'progress' in result && result.progress && typeof result.progress === 'object' && 'note' in result.progress ? result.progress.note : '';
     return [note ? `当前笔记：${note}` : '', ...result.attempts.map((attempt) =>
@@ -108,6 +114,42 @@ function resultText(result: unknown): string {
     )].filter(Boolean).join('\n\n') || '还没有作答记录';
   }
   return JSON.stringify(result, null, 2);
+}
+
+/** 这条回答用到了哪些记忆。只在回答下方的操作栏里留一个图标，不占对话的位置 */
+function UsedMemories({ open, onToggle }: { open: boolean; onToggle(): void }) {
+  const used = useAuiState((state) => state.message.metadata.custom.usedMemories) as AgentMessage['usedMemories'];
+  if (!used?.length) return null;
+  return <button type="button" className="icon-button" aria-expanded={open} aria-label={`这条回答用到的记忆（${used.length}）`} title={`用到了 ${used.length} 条记忆`} onClick={onToggle}>
+    <MemoryIcon width={14} height={14} />
+  </button>;
+}
+function UsedMemoryList() {
+  const used = useAuiState((state) => state.message.metadata.custom.usedMemories) as AgentMessage['usedMemories'];
+  return <ul className="aui-used-memories" aria-label="这条回答用到的记忆">{used?.map((memory) => <li key={memory.id}>{memory.text}</li>)}</ul>;
+}
+
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} 秒`;
+/** 这次回答花了多少。用的是用户自己的 API Key，要看得到 */
+function traceSummary(trace: RunTrace) {
+  const input = trace.steps.reduce((sum, step) => sum + step.inputTokens, 0);
+  const cached = trace.steps.reduce((sum, step) => sum + step.cachedTokens, 0);
+  const output = trace.steps.reduce((sum, step) => sum + step.outputTokens, 0);
+  const firstToken = trace.steps[0]?.firstTokenMs;
+  return [
+    `${trace.model} · ${seconds(trace.totalMs)}${firstToken != null ? `，首字 ${seconds(firstToken)}` : ''}`,
+    input + output ? `输入 ${input} token${cached ? `（缓存命中 ${cached}）` : ''}，输出 ${output} token` : '模型服务没有返回用量',
+    `调用模型 ${trace.steps.length} 次${trace.tools.length ? `，工具：${trace.tools.map((tool) => `${toolLabels[tool.name] ?? tool.name} ${Math.round(tool.ms)} 毫秒${tool.ok ? '' : '（失败）'}`).join('、')}` : ''}`,
+  ];
+}
+function TraceButton({ open, onToggle }: { open: boolean; onToggle(): void }) {
+  const trace = useAuiState((state) => state.message.metadata.custom.trace) as RunTrace | undefined;
+  if (!trace) return null;
+  return <button type="button" className="icon-button" aria-expanded={open} aria-label="运行详情" title="运行详情" onClick={onToggle}><GaugeIcon width={14} height={14} /></button>;
+}
+function TraceDetails() {
+  const trace = useAuiState((state) => state.message.metadata.custom.trace) as RunTrace | undefined;
+  return trace ? <ul className="aui-used-memories aui-trace" aria-label="运行详情">{traceSummary(trace).map((line) => <li key={line}>{line}</li>)}</ul> : null;
 }
 
 function ToolCall({ toolName, result, isError, status }: ToolCallMessagePartProps) {
@@ -126,13 +168,19 @@ function UserMessage() {
   </MessagePrimitive.Root>;
 }
 function AssistantMessage() {
+  const [showMemories, setShowMemories] = useState(false);
+  const [showTrace, setShowTrace] = useState(false);
   return <MessagePrimitive.Root className="aui-message aui-assistant-message">
     <MessagePrimitive.Parts components={{ Text: MarkdownText, tools: { Fallback: ToolCall } }} />
-    <ActionBarPrimitive.Root className="aui-actions" hideWhenRunning>
+    <ActionBarPrimitive.Root className="aui-actions" hideWhenRunning data-pinned={showMemories || showTrace ? '' : undefined}>
       <ActionBarPrimitive.Copy className="icon-button" aria-label="复制回答" title="复制回答">
         <CopyIcon className="aui-copy-idle" width={14} height={14} /><CheckIcon className="aui-copy-done" width={14} height={14} />
       </ActionBarPrimitive.Copy>
+      <UsedMemories open={showMemories} onToggle={() => setShowMemories(!showMemories)} />
+      <TraceButton open={showTrace} onToggle={() => setShowTrace(!showTrace)} />
     </ActionBarPrimitive.Root>
+    {showMemories && <UsedMemoryList />}
+    {showTrace && <TraceDetails />}
   </MessagePrimitive.Root>;
 }
 

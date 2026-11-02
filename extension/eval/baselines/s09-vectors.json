@@ -1,0 +1,460 @@
+{
+ "slug": [
+  [
+   "User Preference Tabs",
+   "user-preference-tabs"
+  ],
+  [
+   "先给提示再给代码",
+   "先给提示再给代码"
+  ],
+  [
+   "  --Hello__World--  ",
+   "hello__world"
+  ],
+  [
+   "二分 边界-老写错",
+   "二分-边界-老写错"
+  ],
+  [
+   "C++ 语言",
+   "c-语言"
+  ],
+  [
+   "!!!",
+   "memory"
+  ],
+  [
+   "",
+   "memory"
+  ],
+  [
+   "a_b c",
+   "a_b-c"
+  ],
+  [
+   "Mixed中文ABC 123",
+   "mixed中文abc-123"
+  ]
+ ],
+ "shouldStore": [
+  [
+   {
+    "name": "lang-pref",
+    "type": "user",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题"
+   },
+   false
+  ],
+  [
+   {
+    "name": "other",
+    "type": "user",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题"
+   },
+   true
+  ],
+  [
+   {
+    "name": "other",
+    "type": "user",
+    "scope": "current_task",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题"
+   },
+   false
+  ],
+  [
+   {
+    "name": "other",
+    "type": "skill",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题"
+   },
+   false
+  ],
+  [
+   {
+    "name": "",
+    "type": "user",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题"
+   },
+   false
+  ],
+  [
+   {
+    "name": "other",
+    "type": "user",
+    "scope": "persistent",
+    "description": " ",
+    "body": "用户主要用 Go 写题"
+   },
+   false
+  ],
+  [
+   {
+    "name": "other",
+    "type": "user",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": ""
+   },
+   false
+  ],
+  [
+   {
+    "name": "other",
+    "type": "user",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": "暂时先用 Go"
+   },
+   false
+  ],
+  [
+   {
+    "name": "other",
+    "type": "user",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": "For now use Go"
+   },
+   false
+  ],
+  [
+   {
+    "name": "other",
+    "type": "user",
+    "scope": "persistent",
+    "description": "本次任务不要写文件",
+    "body": "用户主要用 Go 写题"
+   },
+   false
+  ],
+  [
+   {
+    "name": "other",
+    "type": "user",
+    "scope": "persistent",
+    "description": "同样的 描述",
+    "body": "用户主要用 Go 写题"
+   },
+   false
+  ],
+  [
+   {
+    "name": "other",
+    "type": "user",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": "same body"
+   },
+   false
+  ],
+  [
+   "not a dict",
+   false
+  ]
+ ],
+ "existing": [
+  {
+   "name": "Lang Pref",
+   "description": "其他描述",
+   "body": "其他正文"
+  },
+  {
+   "name": "x",
+   "description": "  同样的   描述 ",
+   "body": "y"
+  },
+  {
+   "name": "z",
+   "description": "w",
+   "body": "Same   BODY"
+  }
+ ],
+ "records": [
+  {
+   "filename": "a.md",
+   "name": "binary-search",
+   "description": "二分查找的边界老写错"
+  },
+  {
+   "filename": "b.md",
+   "name": "lang",
+   "description": "prefers golang for practice"
+  },
+  {
+   "filename": "c.md",
+   "name": "goal",
+   "description": "目标是字节的秋招"
+  },
+  {
+   "filename": "d.md",
+   "name": "hints",
+   "description": "hints before code, golang examples"
+  }
+ ],
+ "keyword": [
+  [
+   "golang 二分查找",
+   [
+    "a.md",
+    "b.md"
+   ]
+  ],
+  [
+   "what about golang practice",
+   [
+    "b.md",
+    "d.md"
+   ]
+  ],
+  [
+   "目标",
+   [
+    "c.md"
+   ]
+  ],
+  [
+   "二分查找的边界老写错",
+   [
+    "a.md"
+   ]
+  ],
+  [
+   "ab",
+   []
+  ],
+  [
+   "",
+   []
+  ],
+  [
+   "hints code golang",
+   [
+    "d.md",
+    "b.md"
+   ]
+  ]
+ ],
+ "messages": [
+  {
+   "role": "user",
+   "content": "q1"
+  },
+  {
+   "role": "assistant",
+   "content": "a1"
+  },
+  {
+   "role": "user",
+   "content": "  q2  "
+  },
+  {
+   "role": "assistant",
+   "content": [
+    {
+     "type": "text",
+     "text": "a2"
+    },
+    {
+     "type": "tool_use",
+     "id": "x"
+    }
+   ]
+  },
+  {
+   "role": "user",
+   "content": [
+    {
+     "type": "tool_result",
+     "tool_use_id": "x",
+     "content": "out"
+    }
+   ]
+  },
+  {
+   "role": "user",
+   "content": "q3"
+  },
+  {
+   "role": "user",
+   "content": "q4"
+  }
+ ],
+ "recentUserText": "q2\nq3\nq4",
+ "recentUserTextOne": "q4",
+ "dialogueText": "user: q1\nassistant: a1\nuser: q2\nassistant: a2\nuser: q3\nuser: q4",
+ "dialogueTextTwo": "user: q3\nuser: q4",
+ "extractJsonArray": [
+  [
+   "前缀 [0, 2] 后缀",
+   [
+    0,
+    2
+   ]
+  ],
+  [
+   "no array",
+   []
+  ],
+  [
+   "[1, 2",
+   []
+  ],
+  [
+   "{\"a\": [1]} [3]",
+   [
+    1
+   ]
+  ],
+  [
+   "[{\"name\": \"x\"}]",
+   [
+    {
+     "name": "x"
+    }
+   ]
+  ],
+  [
+   "[] [1]",
+   []
+  ],
+  [
+   "x[not json] [4,5]",
+   [
+    4,
+    5
+   ]
+  ]
+ ],
+ "validate": [
+  [
+   {
+    "name": "lang-pref",
+    "type": "user",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题"
+   },
+   {
+    "name": "lang-pref",
+    "type": "user",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题",
+    "scope": "persistent"
+   }
+  ],
+  [
+   {
+    "name": "lang-pref",
+    "type": "user",
+    "scope": "x",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题"
+   },
+   null
+  ],
+  [
+   {
+    "name": "lang-pref",
+    "type": "user",
+    "scope": "",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题"
+   },
+   null
+  ],
+  [
+   {
+    "name": "lang-pref",
+    "type": "x",
+    "scope": "persistent",
+    "description": "主要用 Go",
+    "body": "用户主要用 Go 写题"
+   },
+   null
+  ],
+  [
+   3,
+   null
+  ],
+  [
+   {
+    "name": " a ",
+    "type": "user",
+    "description": " d ",
+    "body": " b ",
+    "scope": "current_task"
+   },
+   {
+    "name": "a",
+    "type": "user",
+    "description": "d",
+    "body": "b",
+    "scope": "current_task"
+   }
+  ]
+ ],
+ "validateNoScope": [
+  [
+   {
+    "name": "a",
+    "type": "user",
+    "description": "d",
+    "body": "b"
+   },
+   {
+    "name": "a",
+    "type": "user",
+    "description": "d",
+    "body": "b"
+   }
+  ],
+  [
+   {
+    "name": "a",
+    "type": "user",
+    "description": "d",
+    "body": "b",
+    "scope": "x"
+   },
+   {
+    "name": "a",
+    "type": "user",
+    "description": "d",
+    "body": "b",
+    "scope": "x"
+   }
+  ]
+ ],
+ "markers": [
+  "this session",
+  "current session",
+  "this turn",
+  "current turn",
+  "this task",
+  "current task",
+  "for now",
+  "just this time",
+  "today only",
+  "本次会话",
+  "当前会话",
+  "这一轮",
+  "当前轮次",
+  "本次任务",
+  "当前任务",
+  "暂时",
+  "今回だけ",
+  "このセッション",
+  "現在のタスク"
+ ]
+}

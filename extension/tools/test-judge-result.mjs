@@ -58,6 +58,10 @@ const MOCK = `() => {
   window.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (!url.startsWith('${MOCK_BASE}')) return real(input, init);
+    // 记忆提取在后台进行，不是这个测试关心的，直接回空，也不占模型请求的顺序
+    if (typeof init.body === 'string' && JSON.parse(init.body).tool_choice?.name === 'save_memories') {
+      return new Response(JSON.stringify({ status: 'completed', output: [{ type: 'function_call', id: 'f', call_id: 'c', name: 'save_memories', arguments: '{"memories":[]}' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     const entry = { released: null, body: typeof init.body === 'string' ? init.body : null };
     window.__mockRequests.push(entry);
     return new Promise((resolve) => window.__gates.push({ entry, release: (reply) => {
@@ -192,6 +196,7 @@ try {
   const newChat = await waitFor(async () => findUid(await panelSnap(), 'button "新建对话"'), 15000);
   if (newChat) await mcp.call('click', { pageId: panelId, uid: newChat }, 60000);
   await sleep(800);
+  await waitFor(async () => !(await panelSnap()).includes('正在加载对话'), 20000);
 
   const [none] = await ask('我刚才的运行结果怎么样', [['get_judge_result']]);
   check('no_result_before_judging', /还没有这道题的运行或提交结果/.test(none?.error ?? ''), JSON.stringify(none));

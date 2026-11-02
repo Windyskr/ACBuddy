@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "wxt",
     "build": "wxt build",
-    "compile": "tsc --noEmit",
+    "compile": "tsc --noEmit && tsc --noEmit -p eval",
+    "test": "vitest run",
     "zip": "wxt zip",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.15.31",
     "@assistant-ui/react-markdown": "^0.14.24",
+    "idb": "^8.0.4",
     "katex": "^0.16.47",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -24,12 +26,16 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.2.9",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@wxt-dev/module-react": "^1.2.2",
     "chrome-devtools-mcp": "^1.9.0",
+    "fake-indexeddb": "^6.2.7",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
     "wxt": "^0.21.4"
   }
 }

@@ -125,3 +125,24 @@ button:disabled { cursor: default; }
 .panel-timer b.is-paused { color: var(--faint); }
 .icon-button.timer-button { width: 20px; height: 20px; border-radius: 4px; }
 .timer-button svg { width: 12px; height: 12px; }
+
+.memory-notice { display: flex; align-items: center; gap: 10px; flex: none; margin: 0; padding: 5px 12px; border-bottom: 1px solid var(--border); background: var(--primary-soft); font-size: 12px; }
+.memory-notice span { flex: 1; min-width: 0; }
+.memory-muted-link { color: var(--muted); font-weight: 400; }
+.memory-switch { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+.memory-item { padding: 5px 6px; border-radius: 6px; }
+.memory-item:hover, .memory-item:focus-within { background: var(--surface); }
+.memory-row { display: flex; align-items: flex-start; gap: 4px; }
+.memory-text { flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: inherit; text-align: left; line-height: 1.5; }
+.memory-item:hover .history-delete, .memory-item .history-delete:focus-visible, .memory-item .history-delete[data-confirm] { opacity: 1; }
+.memory-meta { display: flex; align-items: center; gap: 8px; margin-top: 1px; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+.memory-meta .link-button { font-size: 11px; }
+.memory-edit { width: 100%; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: inherit; font: inherit; line-height: 1.5; resize: vertical; }
+.memory-edit:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+.memory-expired { margin-top: 8px; color: var(--muted); font-size: 12px; }
+.memory-expired summary { padding: 4px 6px; cursor: pointer; }
+.memory-expired ul { margin: 0; padding: 0; list-style: none; }
+.memory-expired .memory-text { color: var(--muted); }
+.memory-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12px; }
+.memory-actions .link-button:disabled { color: var(--faint); cursor: default; text-decoration: none; }
+.memory-danger { color: var(--fail); }

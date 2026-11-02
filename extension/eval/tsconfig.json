@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": [
+      "node",
+      "chrome"
+    ],
+    "resolveJsonModule": true
+  },
+  "include": [
+    "./**/*",
+    "../.wxt/wxt.d.ts",
+    "../entrypoints/**/*.test.ts"
+  ],
+  "exclude": [
+    "embed/node_modules"
+  ]
+}

@@ -70,6 +70,34 @@ export async function getMe(): Promise<Me | null> {
   }
 }
 
+/** 和 getMe 不同，失败时抛错：同步要分清「没登录」（401）和「网络不通」 */
+export const currentUser = () => call<Me>('/api/auth/me');
+
+/** 跟随账号同步的记忆。只有记忆本身，没有对话，也没有记忆引用的用户原话 */
+export interface MemoryUpload {
+  id: string;
+  type: 'semantic' | 'episodic' | 'procedural';
+  text: string;
+  concepts: string[];
+  problemKey: string | null;
+  importance: number;
+  attemptIds: number[];
+  sources: string[];
+  validFrom: number;
+  invalidAt: number | null;
+  createdAt: number;
+  supersededBy: string | null;
+}
+export interface RemoteMemory extends MemoryUpload {
+  updatedAt: number;
+  deleted: boolean;
+}
+export const pullMemories = (since: number, after: string) =>
+  call<{ memories: RemoteMemory[]; more: boolean }>(`/api/memories?since=${since}&after=${encodeURIComponent(after)}`);
+export const pushMemories = (put: MemoryUpload[], remove: string[]) =>
+  call<{ updatedAt: number }>('/api/memories/sync', { method: 'POST', body: JSON.stringify({ put, remove }) });
+export const clearRemoteMemories = () => call<{ clearedAt: number }>('/api/memories', { method: 'DELETE' });
+
 export const getProgress = (slug: string, signal?: AbortSignal) =>
   call<{ progress: Progress | null; attempts: Attempt[] }>(
     `/api/progress/leetcode/${encodeURIComponent(slug)}`,

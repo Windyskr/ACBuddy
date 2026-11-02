@@ -2,6 +2,16 @@
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "types": ["chrome", "react-syntax-highlighter"]
-  }
+    "types": [
+      "chrome",
+      "react-syntax-highlighter"
+    ]
+  },
+  "exclude": [
+    "node_modules",
+    ".output",
+    "eval",
+    "vitest.config.ts",
+    "entrypoints/**/*.test.ts"
+  ]
 }

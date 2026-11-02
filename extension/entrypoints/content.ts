@@ -350,7 +350,7 @@ export default defineContentScript({
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                query: 'query AgentQuestion($titleSlug: String!) { question(titleSlug: $titleSlug) { title translatedTitle content translatedContent } }',
+                query: 'query AgentQuestion($titleSlug: String!) { question(titleSlug: $titleSlug) { title translatedTitle content translatedContent topicTags { name translatedName } } }',
                 variables: { titleSlug: info.slug },
               }),
               signal: AbortSignal.timeout(15000),
@@ -361,7 +361,8 @@ export default defineContentScript({
             if (slugFromUrl(location.pathname) !== info.slug) throw new Error('题目已经切换，请重新提问');
             const description = htmlToText(question.translatedContent || question.content || '');
             if (!description) throw new Error('当前题目没有可读取的题干');
-            sendResponse({ ok: true, ...info, title: question.translatedTitle || question.title, description });
+            const tags = (question.topicTags ?? []).map((tag: { name: string; translatedName?: string | null }) => tag.translatedName || tag.name);
+            sendResponse({ ok: true, ...info, title: question.translatedTitle || question.title, description, tags });
           } catch (error) {
             sendResponse({ ok: false, error: error instanceof Error ? error.message : '读取题干失败' });
           }

@@ -36,6 +36,10 @@ jobs:
       - name: Check types
         run: npm run compile
 
+      # 单元测试和评测的确定性部分，不调用模型：检索和写入门禁的指标掉了就失败
+      - name: Run tests
+        run: npm test
+
       - name: Build extension
         run: npm run build
 

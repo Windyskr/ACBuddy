@@ -1,0 +1,9 @@
+{
+  "name": "acbuddy-eval-embed",
+  "private": true,
+  "type": "module",
+  "description": "只给向量检索对照实验用，依赖很大，所以不放进插件的 package.json",
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.0"
+  }
+}

@@ -78,3 +78,7 @@
 .aui-send:hover:not(:disabled) { background: var(--primary-hover); }
 .aui-send:disabled { background: var(--border-strong); }
 .aui-stop, .aui-stop:hover:not(:disabled) { background: var(--text-strong); }
+
+.aui-used-memories { margin: 4px 0 0; padding: 6px 10px 6px 22px; border-radius: 6px; background: var(--surface-2); color: var(--muted); font-size: 12px; line-height: 1.5; }
+.aui-actions[data-pinned] { opacity: 1; }
+.aui-trace { list-style: none; padding-left: 10px; font-variant-numeric: tabular-nums; }

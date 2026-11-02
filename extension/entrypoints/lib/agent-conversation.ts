@@ -29,7 +29,7 @@ export async function getConversationCatalog(): Promise<ConversationCatalog> {
   return (stored[CATALOG_KEY] as ConversationCatalog | undefined) ?? { conversations: [], selected: {} };
 }
 
-async function readConversation(id: string): Promise<Conversation | null> {
+export async function readConversation(id: string): Promise<Conversation | null> {
   const stored = await chrome.storage.local.get(recordKey(id));
   const record = stored[recordKey(id)] as Conversation | undefined;
   return record ? { ...record, messages: completedMessages(record.messages) } : null;
@@ -63,7 +63,7 @@ async function loadProblem(tabId: number, problem: ProblemRef) {
         const { url } = problem;
         return {
           problemTitle: problemLabel(number, title), problemUrl: url,
-          content: problemMessage({ platform: 'leetcode', number, title, difficulty: data.difficultyCn ?? null, url, statement: data.description }),
+          content: problemMessage({ platform: 'leetcode', number, title, difficulty: data.difficultyCn ?? null, tags: data.tags ?? [], url, statement: data.description }),
         };
       }
       if (attempt >= RETRIES) throw new Error('无法连接题目页面，请刷新页面后重试');
@@ -136,7 +136,7 @@ export const saveConversation = (id: string, messages: AgentMessage[]) => locked
   if (!catalog.conversations.some((item) => item.id === id)) throw new Error('对话已删除');
   const record = await readConversation(id);
   if (!record) throw new Error('对话已删除');
-  const firstQuestion = messages.find((message) => message.role === 'user' && message.kind !== 'problem')?.content;
+  const firstQuestion = messages.find((message) => message.role === 'user' && !message.kind)?.content;
   record.messages = completedMessages(messages);
   record.title = firstQuestion ? firstQuestion.replace(/\s+/g, ' ').trim().slice(0, 48) : record.title;
   record.updatedAt = Date.now();

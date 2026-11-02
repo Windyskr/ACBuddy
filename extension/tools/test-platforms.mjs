@@ -94,6 +94,10 @@ const MOCK = `() => {
   window.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (!url.startsWith('${MOCK_BASE}')) return real(input, init);
+    // 记忆提取在后台进行，不是这个测试关心的，直接回空，也不占模型请求的顺序
+    if (typeof init.body === 'string' && JSON.parse(init.body).tool_choice?.name === 'save_memories') {
+      return new Response(JSON.stringify({ status: 'completed', output: [{ type: 'function_call', id: 'f', call_id: 'c', name: 'save_memories', arguments: '{"memories":[]}' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     const entry = { released: null, body: typeof init.body === 'string' ? init.body : null };
     window.__mockRequests.push(entry);
     return new Promise((resolve) => window.__gates.push({ entry, release: (reply) => {
@@ -276,7 +280,8 @@ try {
     const first = modelRequests;
     const [code, highlighted] = await ask('帮我看看第 2 行', steps);
     const offered = await ev(`() => (JSON.parse(window.__mockRequests[${first}].body ?? '{}').tools ?? []).map((t) => t.name)`, panelId);
-    check(`${c.name}_tools_offered`, JSON.stringify(offered) === JSON.stringify(c.tools), JSON.stringify(offered));
+    // 长期记忆默认开启，查找记忆的工具每个平台都有
+    check(`${c.name}_tools_offered`, JSON.stringify(offered) === JSON.stringify([...c.tools, 'search_memory']), JSON.stringify(offered));
     check(`${c.name}_get_code`, code?.code === CODE, JSON.stringify(code).slice(0, 120));
     if (c.tools.includes('highlight_errors')) {
       check(`${c.name}_highlight`, highlighted?.highlighted === 1, JSON.stringify(highlighted));
