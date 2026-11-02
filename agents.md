@@ -52,6 +52,7 @@ node tools/test-auto-record.mjs --site=leetcode.com   # 同上，在力扣国际
 node tools/test-login-guide.mjs    # e2e：登录引导回归
 npm test                           # 单元测试和评测的确定性部分（不调用模型，CI 也跑）
 node tools/test-memory.mjs         # e2e：长期记忆、流式输出、运行详情和上下文压缩（模拟模型，不提交）
+node tools/test-memory-sync.mjs    # e2e：记忆同步，生产构建连线上真实接口（先 npm run build；模拟模型，只动测试账号的记忆）
 node tools/test-platforms.mjs      # e2e：六个平台的顶栏、读题、模型拿到的工具、读代码和标错（模拟模型，不提交；profile 要登录 codefun2000、洛谷、AtCoder、AcWing）
 ```
 

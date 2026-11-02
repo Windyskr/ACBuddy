@@ -32,6 +32,7 @@ extension/
 │   ├── test-auto-record.mjs      # ACBuddy 全链路 e2e（真实提交 AC + WA）
 │   ├── test-judge-result.mjs     # AI 工具 get_judge_result 的 e2e（真实运行，模拟模型）
 │   ├── test-memory.mjs           # 长期记忆、流式输出、运行详情和上下文压缩的 e2e（模拟模型）
+│   ├── test-memory-sync.mjs      # 记忆同步的 e2e：生产构建连线上真实接口（模拟模型，只动测试账号）
 │   ├── test-platforms.mjs        # 多平台 e2e：codefun2000、牛客、力扣的顶栏、读题、读代码和标错
 │   └── test-login-guide.mjs      # 登录引导回归
 ├── .chrome-profile/              # Chrome 独立开发 Profile（chrome-devtools-mcp --user-data-dir，勿提交）
@@ -248,6 +249,7 @@ node tools/test-auto-record.mjs    # ACBuddy 全链路 e2e（真实提交 AC + W
 node tools/test-auto-record.mjs --site=leetcode.com   # 同上，在力扣国际版提交（profile 需登录 leetcode.com）
 node tools/test-login-guide.mjs    # 登录引导回归
 node tools/test-memory.mjs         # 长期记忆、流式输出、运行详情和上下文压缩，模型回复是模拟的，不提交
+npm run build && node tools/test-memory-sync.mjs   # 记忆同步：生产构建连线上真实接口，只动测试账号的记忆；清空接口每天限 5 次，别反复跑
 node tools/test-judge-result.mjs   # AI 读取判题结果：真实运行错误答案和编译错误代码，模型回复是模拟的（编辑器需为 C++）
 node tools/test-judge-result.mjs --submit   # 同上，再真实提交一次错误答案（记进本站的作答检查完删除）
 node tools/test-platforms.mjs      # 多平台：codefun2000、牛客两种答题模式、洛谷（含站内换题）、AtCoder、AcWing、力扣的顶栏、读题、模型拿到的工具、读代码和标错，模型回复是模拟的（codefun2000、洛谷 IDE、AtCoder 提交区、AcWing 要 profile 先登录）
