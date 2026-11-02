@@ -27,6 +27,7 @@
 - 接口以 `functions/api/[[route]].ts` 为准（Pages Functions，随 `npm run deploy` 一起部署），文件头写了认证、响应包络和字段语义，不另写接口文档
 - **改动任何接口（路径、字段、语义）必须同步改两个调用方**：网站 `src/types.ts`、`src/lib/api.ts`，扩展 `extension/entrypoints/lib/api.ts`
 - 题目用 `(platform, slug)` 标识，平台表在接口文件的 `PLATFORMS`，接新平台只加一项、不改表；作答记录另记提交站点 `site`。力扣国内版、国际版同属 `leetcode`：slug 相同、同一道题共用进度，`site` 区分 `leetcode.cn` / `leetcode.com`，提交 id 按站点去重（两站各自编号）
+- 长期记忆（`/api/memories`）跟随账号同步，只有扩展用，网站不调用。对话和记忆引用的用户原话不上传，接口对字段做白名单校验，多余的字段不写库。写入比其他接口贵（D1 按行计费），每个账号每天最多同步 100 次、每次 20 条，见 `RATE_LIMITS.memorySync`
 - 两种笔记互不同步：`progress.note` 是题目当前笔记，只由 `PUT /api/progress/:platform/:slug` 改；`attempts.note` 是每次作答的心得。不要再让任何写入路径把心得复制成当前笔记
 - 本地调试：`npm run dev:api`（http://localhost:8788/api/*）
 - 注册、登录都要带 Cloudflare Turnstile 令牌（`turnstileToken`，action 分别是 `signup`、`login`），服务端核验通过才走原来的逻辑。本地需要 `.dev.vars` 里有 `TURNSTILE_SECRET` 和 `TURNSTILE_HOSTNAMES=localhost,127.0.0.1`。Turnstile 不放行自动化浏览器（实测连点复选框也不行），脚本和 e2e 都没法登录或注册：测试 Profile 的登录要用普通 Chrome 手动完成，e2e 别调 `/api/auth/logout` 退掉它
@@ -49,6 +50,8 @@ npm run zip                        # 生产构建并打包 → .output/acbuddy-e
 node tools/test-auto-record.mjs    # e2e：真实提交 AC + Wrong Answer 各一次，验证自动记录/心得卡/服务器侧
 node tools/test-auto-record.mjs --site=leetcode.com   # 同上，在力扣国际版提交，并检查两站共用进度
 node tools/test-login-guide.mjs    # e2e：登录引导回归
+npm test                           # 单元测试和评测的确定性部分（不调用模型，CI 也跑）
+node tools/test-memory.mjs         # e2e：长期记忆、流式输出、运行详情和上下文压缩（模拟模型，不提交）
 node tools/test-platforms.mjs      # e2e：六个平台的顶栏、读题、模型拿到的工具、读代码和标错（模拟模型，不提交；profile 要登录 codefun2000、洛谷、AtCoder、AcWing）
 ```
 

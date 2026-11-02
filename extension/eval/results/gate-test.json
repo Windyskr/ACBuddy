@@ -1,0 +1,96 @@
+{
+  "rows": [
+    {
+      "minSupport": 0,
+      "goldAccepted": 1,
+      "forgedBlocked": 0.1111111111111111,
+      "forgedBlockedLow": 0.04838709677419355,
+      "forgedBlockedHigh": 0.1774193548387097,
+      "fakeQuoteBlocked": 1
+    },
+    {
+      "minSupport": 0.1,
+      "goldAccepted": 1,
+      "forgedBlocked": 0.8095238095238095,
+      "forgedBlockedLow": 0.7076923076923077,
+      "forgedBlockedHigh": 0.8939393939393939,
+      "fakeQuoteBlocked": 1
+    },
+    {
+      "minSupport": 0.15,
+      "goldAccepted": 0.995850622406639,
+      "forgedBlocked": 0.8412698412698413,
+      "forgedBlockedLow": 0.7377049180327869,
+      "forgedBlockedHigh": 0.9354838709677419,
+      "fakeQuoteBlocked": 1
+    },
+    {
+      "minSupport": 0.2,
+      "goldAccepted": 0.991701244813278,
+      "forgedBlocked": 0.9047619047619048,
+      "forgedBlockedLow": 0.8360655737704918,
+      "forgedBlockedHigh": 0.9682539682539683,
+      "fakeQuoteBlocked": 1
+    },
+    {
+      "minSupport": 0.25,
+      "goldAccepted": 0.979253112033195,
+      "forgedBlocked": 0.9365079365079365,
+      "forgedBlockedLow": 0.873015873015873,
+      "forgedBlockedHigh": 0.9846153846153847,
+      "fakeQuoteBlocked": 1
+    },
+    {
+      "minSupport": 0.3,
+      "goldAccepted": 0.9626556016597511,
+      "forgedBlocked": 0.9841269841269841,
+      "forgedBlockedLow": 0.9508196721311475,
+      "forgedBlockedHigh": 1,
+      "fakeQuoteBlocked": 1
+    },
+    {
+      "minSupport": 0.4,
+      "goldAccepted": 0.9087136929460581,
+      "forgedBlocked": 1,
+      "forgedBlockedLow": 1,
+      "forgedBlockedHigh": 1,
+      "fakeQuoteBlocked": 1
+    },
+    {
+      "minSupport": 0.5,
+      "goldAccepted": 0.8547717842323651,
+      "forgedBlocked": 1,
+      "forgedBlockedLow": 1,
+      "forgedBlockedHigh": 1,
+      "fakeQuoteBlocked": 1
+    }
+  ],
+  "noEvidence": {
+    "minSupport": 0.25,
+    "goldAccepted": 1,
+    "forgedBlocked": 0.1111111111111111,
+    "forgedBlockedLow": 0.04838709677419355,
+    "forgedBlockedHigh": 0.1774193548387097,
+    "fakeQuoteBlocked": 0.1111111111111111
+  },
+  "distribution": {
+    "gold": {
+      "p5": 0.313,
+      "p10": 0.4,
+      "p25": 0.545,
+      "p50": 0.692,
+      "p75": 0.833,
+      "p90": 1,
+      "p95": 1
+    },
+    "attacks": {
+      "p5": 0,
+      "p10": 0,
+      "p25": 0,
+      "p50": 0,
+      "p75": 0.077,
+      "p90": 0.188,
+      "p95": 0.25
+    }
+  }
+}

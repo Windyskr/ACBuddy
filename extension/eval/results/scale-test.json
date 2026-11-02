@@ -1,0 +1,127 @@
+[
+  {
+    "size": 0,
+    "row": {
+      "name": "0",
+      "questions": 223,
+      "recall": 0.9380692167577415,
+      "recallLow": 0.9116022099447514,
+      "recallHigh": 0.9622467771639044,
+      "mrr": 0.9521857923497268,
+      "ndcg": 0.9339722710222732,
+      "staleRate": 0.018867924528301886,
+      "abstainRate": 0.725,
+      "avgInjected": 8.659192825112108,
+      "avgChars": 232.9596412556054,
+      "p95ms": 0.25987499999999386,
+      "byCategory": {
+        "fact": 1,
+        "multi_session": 0.5083333333333334,
+        "update": 0.9811320754716981,
+        "temporal": 1,
+        "preference": 1,
+        "contextual": 0.9875
+      }
+    }
+  },
+  {
+    "size": 50,
+    "row": {
+      "name": "50",
+      "questions": 223,
+      "recall": 0.9271402550091076,
+      "recallLow": 0.8994565217391305,
+      "recallHigh": 0.9532967032967034,
+      "mrr": 0.9453551912568307,
+      "ndcg": 0.9175055041165421,
+      "staleRate": 0.018867924528301886,
+      "abstainRate": 0.725,
+      "avgInjected": 9.798206278026905,
+      "avgChars": 286.03139013452915,
+      "p95ms": 1.1508890000000065,
+      "byCategory": {
+        "fact": 1,
+        "multi_session": 0.5083333333333334,
+        "update": 0.9811320754716981,
+        "temporal": 1,
+        "preference": 1,
+        "contextual": 0.9375
+      }
+    }
+  },
+  {
+    "size": 100,
+    "row": {
+      "name": "100",
+      "questions": 223,
+      "recall": 0.9162112932604737,
+      "recallLow": 0.8874113475177305,
+      "recallHigh": 0.945054945054945,
+      "mrr": 0.940983606557377,
+      "ndcg": 0.9092321836730646,
+      "staleRate": 0.018867924528301886,
+      "abstainRate": 0.725,
+      "avgInjected": 9.852017937219731,
+      "avgChars": 286.6457399103139,
+      "p95ms": 2.075608000000045,
+      "byCategory": {
+        "fact": 1,
+        "multi_session": 0.4583333333333333,
+        "update": 0.9811320754716981,
+        "temporal": 1,
+        "preference": 1,
+        "contextual": 0.9125
+      }
+    }
+  },
+  {
+    "size": 200,
+    "row": {
+      "name": "200",
+      "questions": 223,
+      "recall": 0.9011839708561021,
+      "recallLow": 0.8761261261261261,
+      "recallHigh": 0.9282407407407408,
+      "mrr": 0.9332422586520948,
+      "ndcg": 0.8966405632347653,
+      "staleRate": 0.018867924528301886,
+      "abstainRate": 0.725,
+      "avgInjected": 9.914798206278027,
+      "avgChars": 290.1031390134529,
+      "p95ms": 4.150348000000008,
+      "byCategory": {
+        "fact": 1,
+        "multi_session": 0.4458333333333333,
+        "update": 0.9811320754716981,
+        "temporal": 0.95,
+        "preference": 1,
+        "contextual": 0.875
+      }
+    }
+  },
+  {
+    "size": 500,
+    "row": {
+      "name": "500",
+      "questions": 223,
+      "recall": 0.883424408014572,
+      "recallLow": 0.8513513513513513,
+      "recallHigh": 0.914364640883978,
+      "mrr": 0.9294171220400728,
+      "ndcg": 0.8867323045019009,
+      "staleRate": 0.018867924528301886,
+      "abstainRate": 0.725,
+      "avgInjected": 9.973094170403588,
+      "avgChars": 288.50224215246635,
+      "p95ms": 10.074873999999909,
+      "byCategory": {
+        "fact": 1,
+        "multi_session": 0.4333333333333333,
+        "update": 0.9811320754716981,
+        "temporal": 0.85,
+        "preference": 1,
+        "contextual": 0.85
+      }
+    }
+  }
+]
