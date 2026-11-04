@@ -21,10 +21,10 @@ export class IdbMemoryStore implements MemoryStore, SyncStore {
   constructor(private readonly name = 'acbuddy-memory') {}
 
   private database() {
-    return (this.opening ??= openDB<MemoryDb>(this.name, 2, {
+    return (this.opening ??= openDB<MemoryDb>(this.name, 1, {
       upgrade(db) {
         for (const [store, keyPath] of [['memories', 'id'], ['progress', 'conversationId'], ['outbox', 'id'], ['sync', 'key']] as const) {
-          if (!db.objectStoreNames.contains(store)) db.createObjectStore(store, { keyPath });
+          db.createObjectStore(store, { keyPath });
         }
       },
     }));

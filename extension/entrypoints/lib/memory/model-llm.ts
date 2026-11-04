@@ -1,48 +1,33 @@
-import { endpointFor, modelReply, modelRequest, type ApiType } from '../agent-protocol';
-import type { AgentMessage, AgentSettings } from '../agent';
+import { forcesTool, postModel, structuredReply, structuredRequest } from '../agent-protocol';
+import type { AgentSettings } from '../agent';
 import type { Llm, LlmReply, LlmRequest } from './types';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** 用插件的模型配置发一次请求。记忆的提取和更新走这里，给了 tool 就强制模型调用它，拿到结构化结果 */
+/**
+ * 用插件的模型配置发一次请求。记忆的提取和更新走这里，给了 tool 就要求模型按它的格式回答，结果在 toolArguments。
+ * 各家要结构化结果的办法不一样（强制调用工具、结构化输出），见 structuredRequest
+ */
 export function modelLlm(settings: AgentSettings, { signal, retries = 1, timeoutMs = 60_000 }: { signal?: AbortSignal; retries?: number; timeoutMs?: number } = {}): Llm {
-  const apiType: ApiType = settings.apiType ?? 'responses';
   return {
     async complete(request: LlmRequest): Promise<LlmReply> {
-      const messages: AgentMessage[] = request.messages;
-      const tools = request.tool ? [{ type: 'function', function: {
-        name: request.tool.name, description: request.tool.description, parameters: request.tool.parameters,
-      } }] : [];
-      const body: Record<string, unknown> = modelRequest(settings, messages, request.system ?? '', tools);
-      if (!request.tool) {
-        delete body.tools;
-        delete body.tool_choice;
-      } else if (apiType === 'chat-completions') body.tool_choice = { type: 'function', function: { name: request.tool.name } };
-      else body.tool_choice = { type: 'function', name: request.tool.name };
-      if (!request.system) {
-        if (apiType === 'chat-completions') body.messages = messages;
-        else delete body.instructions;
-      }
+      let body = structuredRequest(settings, request);
       for (let attempt = 0; ; attempt++) {
-        const response = await fetch(endpointFor(settings.baseUrl, apiType), {
-          method: 'POST', credentials: 'omit', redirect: 'error',
-          headers: { 'Content-Type': 'application/json', ...(settings.apiKey ? { Authorization: `Bearer ${settings.apiKey}` } : {}) },
-          body: JSON.stringify(body),
-          signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
-        }).catch((error: unknown) => {
+        const timeout = AbortSignal.timeout(timeoutMs);
+        const response = await postModel(settings, body, signal ? AbortSignal.any([signal, timeout]) : timeout).catch((error: unknown) => {
           signal?.throwIfAborted();
           if (attempt >= retries) throw error;
           return null;
         });
         if (response?.ok) {
-          const data = await response.json() as { usage?: Record<string, number> };
-          const reply = modelReply(data, apiType);
-          return {
-            text: reply.content ?? '',
-            toolArguments: reply.tool_calls?.[0]?.function.arguments ?? null,
-            inputTokens: data.usage?.input_tokens ?? data.usage?.prompt_tokens ?? 0,
-            outputTokens: data.usage?.output_tokens ?? data.usage?.completion_tokens ?? 0,
-          };
+          const { text, toolArguments, usage } = structuredReply(settings, await response.json(), request);
+          return { text, toolArguments, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens };
+        }
+        // 不认识的服务里有的不接受强制调用工具（比如思考模式下的推理模型），改成在提示里要求调用，再试一次
+        if (response?.status === 400 && forcesTool(body)) {
+          body = structuredRequest(settings, request, { force: false });
+          attempt--;
+          continue;
         }
         if (response && response.status !== 429 && response.status < 500) throw new Error(`模型请求失败（HTTP ${response.status}）`);
         if (attempt >= retries) throw new Error(`模型请求失败（HTTP ${response?.status ?? '网络错误'}）`);

@@ -91,10 +91,19 @@ function syncSoon() {
 
 export const listMemories = () => store.all();
 
-export async function recallMemories(input: { text: string; tags: string[]; problemKey: string | null }) {
-  const now = Date.now();
-  const retrieved = await offline.recall({ ...input, now });
-  return { text: offline.format(retrieved), used: retrieved.map((item) => item.memory) };
+/**
+ * 检索这次提问相关的记忆。present 是这段对话里已经给过模型的（id 到文字），这些不再重复注入：
+ * 它们还在之前的提问里，会原样重发。text 只含新增的部分，used 是全部相关的。
+ * 给过的记忆后来被删除或修改了，stale 为 true：调用方要撤掉之前注入的记忆，这次重新给一份完整的，
+ * 不然删掉的内容还会一直发给模型
+ */
+export async function recallMemories(input: { text: string; tags: string[]; problemKey: string | null; present?: Map<string, string> }) {
+  const current = new Map((await store.all()).map((memory) => [memory.id, memory.text]));
+  const stale = [...(input.present ?? [])].some(([id, text]) => current.get(id) !== text);
+  const present = stale ? undefined : input.present;
+  const retrieved = await offline.recall({ text: input.text, tags: input.tags, problemKey: input.problemKey, now: Date.now() });
+  const fresh = retrieved.filter((item) => present?.get(item.memory.id) !== item.memory.text);
+  return { text: offline.format(fresh), used: retrieved.map((item) => item.memory), stale };
 }
 
 export async function searchMemories(query: string) {

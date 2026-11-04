@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { MessageNotSentError } from '@assistant-ui/react';
-import { completedMessages, endpointFor, runAgent, SETTINGS_KEY, type AgentMessage, type AgentSettings, type MemoryAccess } from '../lib/agent';
+import { completedMessages, endpointFor, runAgent, SETTINGS_KEY, type AgentMessage, type AgentSettings, type Effort, type MemoryAccess } from '../lib/agent';
+import { dropStaleReasoning, trimHistory, TRIM_MIN_TOKENS } from '../lib/context';
+import { apiTypeOfUrl, cacheLifetimeMs, PROVIDERS, vendorOf } from '../lib/providers';
+import type { ApiType } from '../lib/agent-protocol';
+import { RefusalError } from '../lib/protocol-common';
 import {
   CATALOG_KEY, createConversation, deleteConversation, getConversationCatalog,
   openProblemConversation, readConversation, saveConversation, selectConversation,
@@ -12,9 +16,12 @@ import { problemOf, type ProblemRef } from '../lib/platforms';
 import AssistantThread, { type Action } from './AssistantThread';
 import MemorySheet from './MemorySheet';
 import Sheet from './Sheet';
-import { ExternalLinkIcon, HistoryIcon, MemoryIcon, PlusIcon, SettingsIcon, TrashIcon } from './icons';
+import { DockIcon, ExternalLinkIcon, FloatIcon, HistoryIcon, MemoryIcon, MinimizeIcon, PlusIcon, SettingsIcon, TrashIcon } from './icons';
+import { floatTab, headerDrag, isFloat, postToPage, viewedTab } from './float';
+import { DISPLAY_KEY, FLOAT_SHOW } from '../lib/display';
 
 const emptySettings: AgentSettings = { baseUrl: '', model: '', apiKey: '' };
+const API_LABELS: Record<ApiType, string> = { responses: 'Responses', 'chat-completions': 'Chat Completions', anthropic: 'Anthropic Messages' };
 type Target = { tabId: number; problem: ProblemRef };
 // 进行中的回答按对话记下：切到别的标签页或对话时在后台继续、照常保存，切回这个对话时接着显示。
 // done 之后留到最后一次保存写完，免得这期间打开对话读到旧记录
@@ -57,6 +64,8 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** 正在进行的回答有几个（各个对话加起来）。回答在这个页面里跑，换显示方式会关掉页面，有回答时不让换 */
+  const [running, setRunning] = useState(0);
   const [activity, setActivity] = useState('');
   const [error, setError] = useState('');
   const [settingsStatus, setSettingsStatus] = useState('');
@@ -181,7 +190,7 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
   const syncTarget = useCallback(async () => {
     const query = ++targetQuery.current;
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tab = await viewedTab();
       if (!mounted.current || query !== targetQuery.current) return;
       const problem = problemOf(tab?.url);
       const next: Target | null = tab?.id != null && problem ? { tabId: tab.id, problem } : null;
@@ -204,7 +213,8 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
       if (change.url || change.status === 'loading') void syncTarget();
     };
     const onBackground = (message: { type?: string }) => { if (message.type === 'PROBLEM_CHANGED') void syncTarget(); };
-    chrome.tabs.onActivated.addListener(onActivated);
+    // 悬浮窗只管自己所在的标签页，换标签页不用管
+    if (!isFloat) chrome.tabs.onActivated.addListener(onActivated);
     chrome.tabs.onUpdated.addListener(onUpdated);
     chrome.runtime.onMessage.addListener(onBackground);
     window.addEventListener('focus', syncTarget);
@@ -257,19 +267,39 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
   const saveSettings = async () => {
     setSettingsStatus('');
     try {
-      const endpoint = endpointFor(draft.baseUrl, draft.apiType);
-      if (!draft.model.trim()) throw new Error('请填写模型名称');
+      if (!draft.baseUrl.trim()) throw new Error('请填写 API 地址');
+      const endpoint = endpointFor(draft.baseUrl, apiTypeOfUrl(draft.baseUrl));
+      if (!draft.model.trim()) throw new Error('请填写模型');
       const permission = chrome.permissions.request({ origins: [`${endpoint.protocol}//${endpoint.hostname}/*`] });
       setSaving(true);
       if (!await permission) throw new Error('需要允许访问该 API 地址才能调用模型');
       await chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
-      const next = { baseUrl: draft.baseUrl.trim().replace(/\/+$/, ''), model: draft.model.trim(), apiKey: draft.apiKey.trim(), apiType: draft.apiType ?? 'responses' as const };
+      // 思考强度只给推荐的服务设：别的服务不一定认这些参数，发了可能报错
+      const effort = draftPreset ? draft.effort : undefined;
+      const next: AgentSettings = { baseUrl: draft.baseUrl.trim().replace(/\/+$/, ''), model: draft.model.trim(), apiKey: draft.apiKey.trim(), ...(effort ? { effort } : {}) };
       await chrome.storage.local.set({ [SETTINGS_KEY]: next });
       setSettings(next); setDraft(next); setShowSettings(false); settingsRef.current = next;
     } catch (reason) { setSettingsStatus(reason instanceof Error ? reason.message : '保存设置失败'); }
     finally { setSaving(false); }
   };
-  const openSettings = () => { setDraft(settings); setSettingsStatus(''); setShowSettings(true); };
+  // 收起时外面的圆钮要知道有没有正在进行的回答
+  useEffect(() => { postToPage({ action: 'status', busy: running > 0 }); }, [running]);
+  const toFloat = async () => {
+    await chrome.storage.local.set({ [DISPLAY_KEY]: 'float' });
+    if (target) await chrome.runtime.sendMessage({ type: FLOAT_SHOW, tabId: target.tabId }).catch(() => {});
+    window.close();
+  };
+  const ownTab = useRef<number | null>(null);
+  useEffect(() => { if (isFloat) void floatTab().then((tab) => { ownTab.current = tab?.id ?? null; }); }, []);
+  const toSidePanel = () => {
+    // 打开侧边栏必须在点击的同一刻调用，不能先等别的
+    if (ownTab.current != null) void chrome.sidePanel.open({ tabId: ownTab.current }).catch(() => {});
+    void chrome.storage.local.set({ [DISPLAY_KEY]: 'sidepanel' });
+  };
+  const openSettings = () => {
+    setDraft(settings);
+    setSettingsStatus(''); setShowSettings(true);
+  };
   const toggleMemory = (next: boolean) => {
     setMemoryEnabled(next); memoryEnabledRef.current = next;
     void chrome.storage.local.set({ [MEMORY_ENABLED_KEY]: next });
@@ -301,7 +331,8 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
     }
     const id = conversation.id;
     const question: AgentMessage = { role: 'user', content: text.trim() };
-    const next: AgentMessage[] = [...completedMessages(history.current), question];
+    // 旧工具结果攒够了才一次裁掉，裁过的记在消息上（见 lib/context.ts）
+    let next: AgentMessage[] = trimHistory([...completedMessages(history.current), question], Date.now(), TRIM_MIN_TOKENS, cacheLifetimeMs(settings));
     // 发给模型的内容由上下文压缩控制，这里只防止单个对话把本机存储占满
     if (JSON.stringify(next).length > 1_000_000) {
       setError('对话内容过长，请新建对话后继续提问');
@@ -310,6 +341,7 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
     const run: Run = { abort: new AbortController(), messages: next, activity: '正在思考…', done: false, streaming: null };
     const { signal } = run.abort;
     runs.current.set(id, run); failures.current.delete(id);
+    setRunning((count) => count + 1);
     history.current = next; setMessages(next);
     setBusy(true); setError(''); setActivity(run.activity);
     const showing = () => mounted.current && selectedRef.current?.id === id;
@@ -329,21 +361,36 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
         if (!run.done && run.streaming) show('');
       });
     };
+    let refused = false;
     const pendingExtract = extractTimers.current.get(id);
     if (pendingExtract) { clearTimeout(pendingExtract); extractTimers.current.delete(id); }
     try {
       let memory: MemoryAccess | null = null;
       if (memoryEnabled) {
-        // 记忆出问题不能影响回答
-        const recalled = await recallMemories({ text: question.content!, tags: problemTags(next[0]), problemKey: target.problem.key }).catch(() => null);
-        if (recalled) {
-          memory = { text: recalled.text, search: searchMemories };
-          if (recalled.used.length) question.usedMemories = recalled.used.map(({ id: memoryId, text: memoryText }) => ({ id: memoryId, text: memoryText }));
+        memory = { search: searchMemories };
+        // 这段对话里（最近一次摘要之后）已经给过模型的记忆，还在之前的提问里，不再重复
+        const since = Math.max(0, next.findLastIndex((item) => item.kind === 'summary'));
+        const present = new Map<string, string>();
+        for (const message of next.slice(since)) {
+          for (const item of message.usedMemories ?? []) present.set(item.id, item.text);
         }
+        // 记忆出问题不能影响回答
+        const recalled = await recallMemories({ text: question.content!, tags: problemTags(next[0]), problemKey: target.problem.key, present }).catch(() => null);
+        if (recalled?.stale) {
+          // 给过的记忆被删除或修改了：撤掉之前注入的，这次重新给一份完整的。缓存会断一次，但删掉的不能再发给模型
+          const scrubbed = next.findIndex((message, index) => index >= since && message !== question && (message.memoryText || message.usedMemories));
+          next = next.map((message, index) => (index >= since && message !== question && (message.memoryText || message.usedMemories)
+            ? { ...message, memoryText: undefined, usedMemories: undefined } : message));
+          if (scrubbed >= 0) next = dropStaleReasoning(next, scrubbed);
+          history.current = next; run.messages = next;
+          if (showing()) setMessages(next);
+        }
+        if (recalled?.text) question.memoryText = recalled.text;
+        if (recalled?.used.length) question.usedMemories = recalled.used.map(({ id: memoryId, text: memoryText }) => ({ id: memoryId, text: memoryText }));
       }
       persist(id, next);
       await runAgent({
-        settings, tabId: target.tabId, problem: target.problem, messages: next, memory, signal,
+        settings, tabId: target.tabId, problem: target.problem, messages: next, memory, conversationId: id, signal,
         onText: showText,
         onCompact(compactedMessages) {
           // 运行中的消息里可能有 runAgent 刚加进去的，把摘要标记放回同样的位置
@@ -352,7 +399,8 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
           const after = compactedMessages[compactedMessages.indexOf(marker) + 1];
           const index = run.messages.indexOf(after!);
           if (index < 0) return;
-          run.messages = [...run.messages.slice(0, index), marker, ...run.messages.slice(index)];
+          // 摘要之后留下的消息，思考块和 runAgent 里一样作废（见 lib/context.ts）
+          run.messages = dropStaleReasoning([...run.messages.slice(0, index), marker, ...run.messages.slice(index)], index);
           persist(id, completedMessages(run.messages));
         },
         onMessage(message) {
@@ -371,15 +419,17 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
         if (last?.role === 'assistant') last.trace = trace;
       });
     } catch (reason) {
+      refused = reason instanceof RefusalError;
       const message = signal.aborted ? '本次回答已停止' : reason instanceof Error ? reason.message : '请求失败';
       if (showing()) setError(message);
       else if (!signal.aborted) failures.current.set(id, message);
     } finally {
       cancelAnimationFrame(frame);
-      // 中途停止或出错时，已经生成的文字留下来
-      if (run.streaming?.content) run.messages = [...run.messages, run.streaming];
+      // 中途停止或出错时，已经生成的文字留下来；被模型拒绝时半截的文字不算数
+      if (run.streaming?.content && !refused) run.messages = [...run.messages, run.streaming];
       run.streaming = null;
       run.messages = completedMessages(run.messages); run.done = true;
+      setRunning((count) => count - 1);
       persist(id, run.messages);
       void pendingSave.current.then(() => { if (runs.current.get(id) === run) runs.current.delete(id); });
       if (!signal.aborted && mounted.current) scheduleExtract(id);
@@ -387,6 +437,9 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
     }
   };
 
+  // 地址、密钥和模型都由用户填，是哪家服务、用哪种接口按地址判断，不让用户选
+  const draftPreset = PROVIDERS.find((item) => item.id === vendorOf(draft.baseUrl)) ?? null;
+  const draftApiType = apiTypeOfUrl(draft.baseUrl);
   const keys = [...new Set(catalog.conversations.map((item) => item.key))];
   keys.sort((a, b) => Number(b === target?.problem.key) - Number(a === target?.problem.key));
   const groups = keys.map((key) => ({
@@ -398,14 +451,20 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
     : undefined;
 
   return <section className="agent-chat" aria-label="AI 编程助手">
-    <header className="panel-header">
+    <header className={isFloat ? 'panel-header panel-header-float' : 'panel-header'} {...headerDrag}>
       {header}
       <div className="panel-actions">
         <button type="button" className="icon-button" aria-label="对话记录" title="对话记录" onClick={() => setShowHistory(true)}><HistoryIcon /></button>
         <button type="button" className="icon-button" aria-label="记忆" title="记忆" onClick={() => setShowMemory(true)}><MemoryIcon /></button>
         <button type="button" className="icon-button" aria-label="新建对话" title="新建对话" disabled={!target || loading} onClick={newConversation}><PlusIcon /></button>
+        {!isFloat && <button type="button" className="icon-button" aria-label="改成悬浮窗" title={running ? '回答完再切换' : '改成悬浮窗'} disabled={running > 0} onClick={() => void toFloat()}><FloatIcon /></button>}
         <button type="button" className="icon-button" aria-label="打开 ACBuddy 网站" title="打开 ACBuddy 网站" onClick={() => openSite()}><ExternalLinkIcon /></button>
         <button type="button" className="icon-button" aria-label="设置" title="设置" disabled={busy} onClick={openSettings}><SettingsIcon /></button>
+        {isFloat && <>
+          <span className="panel-actions-sep" />
+          <button type="button" className="icon-button" aria-label="停靠到侧边栏" title={running ? '回答完再切换' : '停靠到侧边栏'} disabled={running > 0} onClick={toSidePanel}><DockIcon /></button>
+          <button type="button" className="icon-button" aria-label="收起" title="收起" onClick={() => postToPage({ action: 'collapse' })}><MinimizeIcon /></button>
+        </>}
       </div>
     </header>
     {memoryNotice && <p className="memory-notice" role="status">
@@ -455,14 +514,25 @@ export default function AgentChat({ problemKey, account, header }: { problemKey:
         </section>
         <form className="settings-section" onSubmit={(event) => { event.preventDefault(); void saveSettings(); }}>
           <h3>AI 模型</h3>
-          <label className="field">接口类型<select value={draft.apiType ?? 'responses'} onChange={(e) => setDraft({ ...draft, apiType: e.target.value as 'responses' | 'chat-completions' })}>
-            <option value="responses">Responses（默认）</option>
-            <option value="chat-completions">Chat Completions</option>
-          </select></label>
-          <label className="field">API 基础地址<input type="url" placeholder="https://服务地址/v1" value={draft.baseUrl} onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })} /></label>
-          <label className="field">模型名称<input value={draft.model} placeholder="支持工具调用的模型" onChange={(e) => setDraft({ ...draft, model: e.target.value })} /></label>
+          <label className="field">API 地址<input type="url" list="acb-url-presets" placeholder="例如 https://api.deepseek.com" value={draft.baseUrl} onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })} /></label>
+          <datalist id="acb-url-presets">{PROVIDERS.map((provider) => <option key={provider.id} value={provider.baseUrl}>{provider.label}</option>)}</datalist>
           <label className="field">API Key<input type="password" autoComplete="off" value={draft.apiKey} onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })} /></label>
-          <p className="settings-note">服务需支持所选接口的工具调用。密钥和对话只保存在本机，记忆登录后同步到账号；提问时题目、代码、作答记录和相关记忆会按需发送到该服务。</p>
+          <label className="field">模型<input list={draftPreset ? 'acb-model-presets' : undefined} value={draft.model}
+            placeholder={draftPreset ? `例如 ${draftPreset.models[0]!.id}` : '支持工具调用的模型'} onChange={(e) => setDraft({ ...draft, model: e.target.value })} /></label>
+          {draftPreset && <datalist id="acb-model-presets">{draftPreset.models.map((model) => <option key={model.id} value={model.id}>{model.label}</option>)}</datalist>}
+          {draftPreset && <label className="field">思考强度<select value={draft.effort ?? ''} onChange={(e) => {
+            const { effort: _effort, ...rest } = draft;
+            setDraft(e.target.value ? { ...rest, effort: e.target.value as Effort } : rest);
+          }}>
+            <option value="">默认</option>
+            <option value="low">低：更快更省</option>
+            <option value="medium">中</option>
+            <option value="high">高：更慢更贵</option>
+          </select></label>}
+          <p className="settings-note">
+            {!draftPreset && draft.baseUrl.trim() && `按 ${API_LABELS[draftApiType]} 接口调用，服务需支持工具调用；地址写到 /responses 或 /messages 可以换接口。`}
+            密钥和对话只保存在本机，记忆登录后同步到账号；提问时题目、代码、作答记录和相关记忆会按需发送到该服务。
+          </p>
           <div className="settings-actions">
             <button type="submit" className="button button-primary" disabled={saving || busy}>{saving ? '正在保存…' : '保存设置'}</button>
             {settingsStatus && <span className="settings-status" role="status">{settingsStatus}</span>}

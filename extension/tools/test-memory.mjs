@@ -65,7 +65,9 @@ const MOCK = `() => {
     }
     if (!url.startsWith('${MOCK_BASE}')) return real(input, init);
     const body = JSON.parse(init.body);
-    const tool = body.tool_choice?.name ?? (body.tools ? null : 'summary');
+    // 摘要有两种：共用开头的（带着平时的工具，末尾是摘要指令）和单独的（不带工具）
+    const last = JSON.stringify((body.input ?? body.messages ?? []).at(-1) ?? '');
+    const tool = body.tool_choice?.name ?? (!body.tools || last.includes('压缩成一份摘要') ? 'summary' : null);
     const json = (reply) => new Response(JSON.stringify(reply), { status: 200, headers: { 'Content-Type': 'application/json' } });
     if (tool === 'save_memories' && window.__autoEmpty) {
       return json({ status: 'completed', output: [{ type: 'function_call', id: 'f', call_id: 'c', name: tool, arguments: '{"memories":[]}' }] });
@@ -192,7 +194,7 @@ try {
   await ev(clearMemoryDb(), panelId);
   await ev(`async () => {
     await chrome.storage.local.remove(['acb-memory-enabled', 'acb-memory-notice-seen']);
-    await chrome.storage.local.set({ '${SETTINGS_KEY}': { baseUrl: '${MOCK_BASE}', model: 'e2e-model', apiKey: 'e2e-key', apiType: 'responses' } });
+    await chrome.storage.local.set({ '${SETTINGS_KEY}': { baseUrl: '${MOCK_BASE}/responses', model: 'e2e-model', apiKey: 'e2e-key' } });
     setTimeout(() => location.reload(), 50);
     return true;
   }`, panelId).catch(() => null);
@@ -274,6 +276,16 @@ try {
   snap = await waitFor(async () => { const s = await panelSnap(); return s.includes(MEMORY_TEXT) ? s : null; }, 8000);
   check('used_memories_shown', !!snap);
 
+  // 记忆跟着提问留在历史里，下一次提问原样重发，不再重复注入
+  await ask('还有别的思路吗');
+  body = await nextRequest(null);
+  const users = body.input.filter((item) => item.role === 'user').map((item) => item.content);
+  const earlier = users.find((content) => content.endsWith('这题怎么下手')) ?? '';
+  check('memory_kept_in_history', earlier.includes('<memory>') && earlier.includes(MEMORY_TEXT));
+  check('memory_not_repeated', !latestUser(body).includes('<memory>') && latestUser(body).endsWith('还有别的思路吗'));
+  await release(null, answer('也可以排序加双指针'));
+  await finished();
+
   // 删除后不再注入
   await click('button "记忆"');
   await click(`button "删除记忆：${MEMORY_TEXT}"`);
@@ -295,6 +307,7 @@ try {
   body = await nextRequest(null);
   // 同一段对话的历史里还留着上一轮 search_memory 的结果，这里只看这一轮注入的内容
   check('deleted_memory_not_injected', !latestUser(body).includes(MEMORY_TEXT));
+  check('deleted_memory_removed_from_history', body.input.filter((item) => item.role === 'user').every((item) => !String(item.content).includes(MEMORY_TEXT)));
   await release(null, answer('好'));
   await finished();
 
@@ -357,7 +370,9 @@ try {
   await ev('() => { window.__autoEmpty = false; return true; }', panelId);
   await ask('压缩之后的问题');
   body = await nextRequest('summary');
-  check('summary_request_sent', JSON.stringify(body.input).includes('很早的提问0') && !JSON.stringify(body).includes('整数数组'));
+  const summaryInput = JSON.stringify(body.input);
+  // 共用开头：同样的系统提示和工具，历史原样带上，只在末尾加摘要指令
+  check('summary_shares_the_prefix', Array.isArray(body.tools) && body.tools.length > 0 && summaryInput.includes('很早的提问0') && summaryInput.includes('压缩之后的问题') && JSON.stringify(body.input.at(-1)).includes('压缩成一份摘要'));
   await release('summary', answer('这是摘要内容'));
   body = await nextRequest(null);
   const sent = JSON.stringify(body.input);

@@ -12,6 +12,7 @@ npx tsx eval/run.ts retrieval --split test    # 检索消融：假设提取和�
 npx tsx eval/run.ts scale --split test        # 记忆库变大时的召回率和耗时
 npx tsx eval/run.ts gate --split test         # 写入门禁：假设提取模型已被攻破，代码层能挡住多少
 npx tsx eval/run.ts tune                      # 在开发集上搜索检索参数，测试集不参与
+npx tsx eval/run.ts cache                     # 提示缓存模拟：多轮对话里每次请求能命中多少，对比改之前的做法和不同的裁剪阈值
 npx tsx eval/run.ts lme-retrieval             # LongMemEval 原始对话上的 BM25（数据集放 eval/.cache/）
 ```
 
@@ -20,10 +21,9 @@ npx tsx eval/run.ts lme-retrieval             # LongMemEval 原始对话上的 B
 模型配置写在 `eval/.cache/model.env`（gitignored），也可以直接设环境变量。密钥不进代码、缓存和结果文件。请求和响应缓存在 `eval/.cache/`，同样的请求不会重复花钱。
 
 ```bash
-# eval/.cache/model.env
+# eval/.cache/model.env（用哪种接口和插件一样按地址判断，比如写到 /responses 就用 Responses）
 EVAL_BASE_URL=https://服务地址/v1
 EVAL_MODEL=模型名
-EVAL_API_TYPE=chat-completions
 EVAL_API_KEY=…
 ```
 
@@ -34,7 +34,23 @@ npx tsx eval/run.ts injection
 npx tsx eval/run.ts lme --limit 60 --conditions none,s09,acbuddy
 ```
 
-判分可以用另一个模型：再设 `EVAL_JUDGE_BASE_URL`、`EVAL_JUDGE_API_KEY`、`EVAL_JUDGE_MODEL`、`EVAL_JUDGE_API_TYPE`。判分提示词照抄 LongMemEval 的 `evaluate_qa.py`。`lme` 还会生成 `results/lme-<条件>.hypotheses.jsonl`，可以直接喂给官方脚本，用它规定的 gpt-4o 判分。
+推荐模型的真实接口冒烟测试，用插件自己的协议代码跑三轮带工具调用的对话、一次裁剪和一次记忆整理，检查第二轮能不能命中缓存。密钥按服务分开写，没写的服务跳过。每个模型大约两万输入、几千输出 token，八个组合全跑估计不到 1 美元，大头是 Terra 和 Sonnet：
+
+```bash
+# eval/.cache/model.env
+DEEPSEEK_API_KEY=…
+OPENAI_API_KEY=…
+ANTHROPIC_API_KEY=…
+OPENROUTER_API_KEY=…
+```
+
+```bash
+npx tsx eval/run.ts providers                          # 有密钥的服务全跑
+npx tsx eval/run.ts providers --only anthropic         # 只跑一家
+npx tsx eval/run.ts providers --models gpt-5.6-luna    # 只跑某个模型
+```
+
+判分可以用另一个模型：再设 `EVAL_JUDGE_BASE_URL`、`EVAL_JUDGE_API_KEY`、`EVAL_JUDGE_MODEL`。判分提示词照抄 LongMemEval 的 `evaluate_qa.py`。`lme` 还会生成 `results/lme-<条件>.hypotheses.jsonl`，可以直接喂给官方脚本，用它规定的 gpt-4o 判分。
 
 ## 目录
 

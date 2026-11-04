@@ -144,7 +144,7 @@ try {
   }`);
   if ((await serverRows()).some((row) => !row.deleted)) await server('DELETE', '/memories');
   await ev(CLEAR_LOCAL);
-  await ev(`async () => { await chrome.storage.local.set({ '${SETTINGS_KEY}': { baseUrl: '${MOCK_BASE}', model: 'e2e-model', apiKey: 'e2e-key', apiType: 'responses' }, 'acb-memory-notice-seen': true }); return true; }`);
+  await ev(`async () => { await chrome.storage.local.set({ '${SETTINGS_KEY}': { baseUrl: '${MOCK_BASE}/responses', model: 'e2e-model', apiKey: 'e2e-key' }, 'acb-memory-notice-seen': true }); return true; }`);
   await reloadPanel();
   await click('button "新建对话"');
   await sleep(1000);

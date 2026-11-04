@@ -46,6 +46,10 @@ button:disabled { cursor: default; }
 .panel-problem-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .panel-problem-empty { color: var(--muted); }
 .panel-actions { grid-area: actions; display: flex; align-items: center; gap: 2px; }
+.panel-actions-sep { flex: none; width: 1px; height: 16px; margin: 0 3px; background: var(--border); }
+/* 悬浮窗里顶栏的空白处是拖动把手（见 float.ts 的 headerDrag） */
+.panel-header-float { cursor: grab; user-select: none; touch-action: none; }
+.panel-header-float button, .panel-header-float a { cursor: pointer; }
 .panel-meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; color: var(--muted); font-size: 12px; }
 .panel-meta b { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .panel-banner {

@@ -134,11 +134,14 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} 秒`;
 function traceSummary(trace: RunTrace) {
   const input = trace.steps.reduce((sum, step) => sum + step.inputTokens, 0);
   const cached = trace.steps.reduce((sum, step) => sum + step.cachedTokens, 0);
+  const written = trace.steps.reduce((sum, step) => sum + (step.cacheWriteTokens ?? 0), 0);
   const output = trace.steps.reduce((sum, step) => sum + step.outputTokens, 0);
   const firstToken = trace.steps[0]?.firstTokenMs;
+  const cache = [cached ? `缓存命中 ${cached}` : '', written ? `写入缓存 ${written}` : ''].filter(Boolean).join('，');
+  const effort = trace.effort ? `（思考强度：${{ low: '低', medium: '中', high: '高' }[trace.effort]}）` : '';
   return [
-    `${trace.model} · ${seconds(trace.totalMs)}${firstToken != null ? `，首字 ${seconds(firstToken)}` : ''}`,
-    input + output ? `输入 ${input} token${cached ? `（缓存命中 ${cached}）` : ''}，输出 ${output} token` : '模型服务没有返回用量',
+    `${trace.model}${effort} · ${seconds(trace.totalMs)}${firstToken != null ? `，首字 ${seconds(firstToken)}` : ''}`,
+    input + output ? `输入 ${input} token${cache ? `（${cache}）` : ''}，输出 ${output} token` : '模型服务没有返回用量',
     `调用模型 ${trace.steps.length} 次${trace.tools.length ? `，工具：${trace.tools.map((tool) => `${toolLabels[tool.name] ?? tool.name} ${Math.round(tool.ms)} 毫秒${tool.ok ? '' : '（失败）'}`).join('、')}` : ''}`,
   ];
 }

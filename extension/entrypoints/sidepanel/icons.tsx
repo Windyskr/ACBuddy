@@ -12,6 +12,11 @@ export const MemoryIcon = icon(<><path d="M12 5a3 3 0 1 0-6 .1 4 4 0 0 0-2.5 5.8
 export const GaugeIcon = icon(<><path d="M4.5 18a9 9 0 1 1 15 0" /><path d="M12 14l4-5" /><circle cx="12" cy="14.5" r="1" /></>);
 export const HistoryIcon = icon(<><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" /><path d="M3 4v4.5h4.5" /><path d="M12 7.5V12l3 2" /></>);
 export const ExternalLinkIcon = icon(<><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" /></>);
+/** 改成悬浮窗：窗口里浮着一个小窗 */
+export const FloatIcon = icon(<><rect x="3" y="5" width="18" height="14" rx="2" /><rect x="12" y="11" width="6" height="5" rx="1" /></>);
+/** 停靠到侧边栏：窗口右边一栏 */
+export const DockIcon = icon(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M15 5v14" /></>);
+export const MinimizeIcon = icon(<path d="M6 12h12" />);
 export const SettingsIcon = icon(<><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></>);
 export const SendIcon = icon(<path d="M12 19V5M6 11l6-6 6 6" />);
 export const ArrowDownIcon = icon(<path d="M12 5v14M6 13l6 6 6-6" />);

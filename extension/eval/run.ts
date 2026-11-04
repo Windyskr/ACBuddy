@@ -11,6 +11,10 @@ import { DEFAULT_GATE } from '../entrypoints/lib/memory/gate';
 import { runExtraction, summarizeExtraction, type ExtractionOutcome } from './suites/extraction';
 import { gateSuite, supportDistribution } from './suites/gate';
 import { compareInjection, runInjection, summarizeInjection } from './suites/injection';
+import { CACHE_STRATEGIES, simulateCache, thresholdStrategy } from './suites/cache';
+import { KEY_NAMES, presetModels, runProvider, type ProviderOutcome } from './suites/providers';
+import type { Vendor } from '../entrypoints/lib/providers';
+import type { Effort } from '../entrypoints/lib/agent';
 import { loadLongMemEval, sampleQuestions, sessionRetrieval, toLearner } from './suites/longmemeval';
 import { compareQa, runLearner, summarizeQa, type QaOutcome } from './suites/qa';
 import { buildEmbeddings, loadEmbeddings } from './embed/embed';
@@ -72,6 +76,45 @@ async function main() {
       console.error(errors.join('\n'));
       process.exitCode = 1;
     } else console.log('校验通过');
+    return;
+  }
+  if (command === 'providers') {
+    // 推荐模型的真实接口冒烟测试。密钥按服务分开放在 model.env 里，没有密钥的服务跳过
+    const only = option('only', '').split(',').filter(Boolean);
+    const models = option('models', '').split(',').filter(Boolean);
+    const effort = option('effort', '') as Effort | '';
+    if (effort && !['low', 'medium', 'high'].includes(effort)) throw new Error('--effort 只能是 low、medium 或 high');
+    const rows: ProviderOutcome[] = [];
+    for (const vendor of Object.keys(KEY_NAMES) as Vendor[]) {
+      if (only.length && !only.includes(vendor)) continue;
+      const key = process.env[KEY_NAMES[vendor]];
+      if (!key) { console.log(`跳过 ${vendor}：model.env 里没有 ${KEY_NAMES[vendor]}`); continue; }
+      for (const model of presetModels(vendor).filter((id) => !models.length || models.includes(id))) {
+        console.log(`${vendor} / ${model} …`);
+        rows.push(await runProvider(vendor, model, key, effort || undefined));
+      }
+    }
+    if (!rows.length) {
+      console.error('没有可以测的服务，先在 eval/.cache/model.env 里写上至少一家的密钥');
+      process.exitCode = 1;
+      return;
+    }
+    const tokens = (row: ProviderOutcome) => row.turns.flatMap((turn) => turn.steps).reduce((sum, step) => ({
+      input: sum.input + step.inputTokens, cached: sum.cached + step.cachedTokens, output: sum.output + step.outputTokens,
+    }), { input: 0, cached: 0, output: 0 });
+    save('providers', rows, table(
+      ['服务', '模型', '结果', '每轮调用次数', '用到的工具', '第二轮命中缓存', '裁剪后继续', '提取到的记忆', '输入（命中缓存）/输出 token', '错误'],
+      rows.map((row) => {
+        const total = tokens(row);
+        return [
+          row.provider, row.model, row.ok ? '通过' : '失败', row.turns.map((turn) => turn.steps.length).join(' / ') || '—',
+          [...new Set(row.turns.flatMap((turn) => turn.steps.flatMap((step) => step.tools)))].join('、') || '—',
+          String(row.secondTurnCached), row.afterTrimOk ? '是' : '否', String(row.memories),
+          `${total.input}（${total.cached}）/ ${total.output}`, row.error?.replace(/\|/g, '\\|') ?? '',
+        ];
+      }),
+    ));
+    if (rows.some((row) => !row.ok)) process.exitCode = 1;
     return;
   }
   if (command === 'injection') {
@@ -148,6 +191,63 @@ async function main() {
       table(['条件', ...categories.map((category) => CATEGORY_NAMES[category])], rows.map((row) => [row.name, ...categories.map((category) => percent(row.byCategory[category] ?? Number.NaN))])),
     ].join('\n\n');
     save(`retrieval-${split}-d${distractors}${noise === 'all' ? '-all' : ''}`, rows, markdown);
+    return;
+  }
+  if (command === 'cache') {
+    const lengths = option('turns', '10,30').split(',').map(Number);
+    // 推荐模型的实际价格（相对没命中的输入价）：命中价，和写入缓存比原价多收的部分
+    const prices = [
+      { name: 'DeepSeek V4.1 Flash', read: 0.02, write: 0 },
+      { name: 'GPT-5.6 Luna / Terra', read: 0.1, write: 0.25 },
+      { name: 'Claude Sonnet 5.5，官方接口（1 小时缓存）', read: 0.1, write: 1 },
+      { name: 'Claude Sonnet 5.5，经 OpenRouter（5 分钟缓存）', read: 0.1, write: 0.25 },
+    ];
+    const sections = lengths.map((turns) => {
+      const rows = CACHE_STRATEGIES.map((strategy) => simulateCache(strategy, turns));
+      const base = rows[0]!;
+      return [
+        `## ${turns} 轮对话（每轮读一次代码，${turns * 2} 次请求）`,
+        table(['做法', '每轮提问要原价处理的 token', '缓存命中比例', '最后一次请求的 token', '费用（缓存 1 折）', '费用（缓存 5 折）'], rows.map((row) => [
+          row.name, fixed(row.uncachedPerQuestion, 0), percent(row.cachedTokens / row.inputTokens), String(row.lastRequestTokens),
+          percent(row.cost(0.1) / base.cost(0.1)), percent(row.cost(0.5) / base.cost(0.5)),
+        ])),
+      ].join('\n\n');
+    });
+    const sweep = [10, 30, 60].map((turns) => {
+      const base = simulateCache(CACHE_STRATEGIES[0]!, turns);
+      const rows = [1000, 2000, 4000, 8000, 16000].map((minTokens) => simulateCache(thresholdStrategy(minTokens), turns));
+      return [
+        `### ${turns} 轮`,
+        table(['裁剪阈值', '每轮提问要原价处理的 token', '最后一次请求的 token', '费用（1 折）', '费用（5 折）', ...prices.slice(0, 3).map((price) => price.name)], rows.map((row) => [
+          row.name, fixed(row.uncachedPerQuestion, 0), String(row.lastRequestTokens),
+          percent(row.cost(0.1) / base.cost(0.1)), percent(row.cost(0.5) / base.cost(0.5)),
+          ...prices.slice(0, 3).map((price) => percent(row.cost(price.read, price.write) / base.cost(price.read, price.write))),
+        ])),
+      ].join('\n\n');
+    });
+    const strategy = (prefix: string) => CACHE_STRATEGIES.find((item) => item.name.startsWith(prefix))!;
+    const priced = lengths.map((turns) => {
+      const [before, after, never] = ['改之前', '改之后', '参照'].map((prefix) => simulateCache(strategy(prefix), turns));
+      return [
+        `### ${turns} 轮`,
+        table(['模型（命中 / 写入，原价为 1）', '改之后', '参照：从不裁'], prices.map((price) => [
+          `${price.name}（${price.read} / ${1 + price.write}）`,
+          percent(after!.cost(price.read, price.write) / before!.cost(price.read, price.write)),
+          percent(never!.cost(price.read, price.write) / before!.cost(price.read, price.write)),
+        ])),
+      ].join('\n\n');
+    });
+    const markdown = [
+      '# 提示缓存模拟',
+      '按消息比较相邻两次请求的公共开头，算能命中缓存的 token。用插件里真实的 trimHistory 和 requestMessages 拼请求；费用以「改之前」为 100%。不调用模型，结果完全确定。',
+      ...sections,
+      '## 按推荐模型的实际价格（费用仍以「改之前」为 100%）',
+      '没命中的输入都会写进缓存，写入按各家的写入价算；假设两次请求之间缓存都没过期，不算输出。',
+      ...priced,
+      '## 裁剪阈值（费用仍以「改之前」为 100%）',
+      ...sweep,
+    ].join('\n\n');
+    save('cache', { lengths }, markdown);
     return;
   }
   if (command === 'embed') {
@@ -254,7 +354,7 @@ async function main() {
     save(`qa-${split}`, { summaries, outcomes: Object.fromEntries(allOutcomes) }, markdown);
     return;
   }
-  console.error('用法：tsx eval/run.ts <validate|retrieval|embed|scale|tune|gate|extraction|qa|injection|lme-retrieval|lme> [--only L02,L03] [--split dev|test|all] [--distractors N] [--noise episodic|all] [--sizes 0,50] [--conditions a,b] [--limit N]');
+  console.error('用法：tsx eval/run.ts <validate|retrieval|embed|scale|tune|gate|cache|extraction|qa|injection|lme-retrieval|lme> [--only L02,L03] [--split dev|test|all] [--distractors N] [--noise episodic|all] [--sizes 0,50] [--conditions a,b] [--limit N]');
   process.exitCode = 1;
 }
 

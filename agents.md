@@ -52,6 +52,9 @@ node tools/test-auto-record.mjs --site=leetcode.com   # 同上，在力扣国际
 node tools/test-login-guide.mjs    # e2e：登录引导回归
 npm test                           # 单元测试和评测的确定性部分（不调用模型，CI 也跑）
 node tools/test-memory.mjs         # e2e：长期记忆、流式输出、运行详情和上下文压缩（模拟模型，不提交）
+node tools/test-providers.mjs      # e2e：推荐服务的设置预设，Claude 和 DeepSeek 接口在真实页面上的一次工具调用（模拟模型，不保存设置）
+node tools/test-float.mjs          # e2e：悬浮窗模式（切换、拖动、调大小、收起、按网站记位置、停靠回侧边栏；本机起模拟模型）
+npx tsx eval/run.ts providers      # 推荐模型的真实接口冒烟测试，要 eval/.cache/model.env 里的各家密钥，会花一点钱
 node tools/test-memory-sync.mjs    # e2e：记忆同步，生产构建连线上真实接口（先 npm run build；模拟模型，只动测试账号的记忆）
 node tools/test-platforms.mjs      # e2e：六个平台的顶栏、读题、模型拿到的工具、读代码和标错（模拟模型，不提交；profile 要登录 codefun2000、洛谷、AtCoder、AcWing）
 ```
@@ -93,8 +96,8 @@ node tools/test-platforms.mjs      # e2e：六个平台的顶栏、读题、模�
 
 - 题目读取、编辑器访问、插件消息传递和浏览器存储使用实际实现。公共题目可以使用 `two-sum` 和 `3sum`，题目地址从项目题库或当前页面确认。
 - 需要测试消息展示时，可以通过 `entrypoints/lib/agent-conversation.ts` 的现有方法创建临时对话并保存检查内容，再重新打开对话检查界面。
-- 没有真实模型配置时，可以临时拦截侧边栏对 `https://agent-review.invalid/v1` 的模型请求，返回符合所选接口格式的模拟响应，继续执行真实 Agent 循环和真实工具。
-- 模拟响应应包含工具调用及后续回答；验证工具调用编号、工具结果和后续模型请求正确关联。修改协议处理时同时检查 Responses 与 Chat Completions，Responses 还要检查推理项回传。
+- 没有真实模型配置时，可以临时拦截侧边栏对 `https://agent-review.invalid/v1` 的模型请求，返回符合接口格式的模拟响应，继续执行真实 Agent 循环和真实工具。用哪种接口按地址判断：地址写到 `/responses` 是 Responses，写到 `/messages` 是 Anthropic Messages，其余不认识的地址是 Chat Completions。
+- 模拟响应应包含工具调用及后续回答；验证工具调用编号、工具结果和后续模型请求正确关联。修改协议处理时同时检查 Responses、Chat Completions 和 Anthropic Messages：Responses 检查推理项回传，Claude 检查带签名的思考块原样回传、改过历史后作废的思考块被删掉，DeepSeek 检查 `reasoning_content` 回传。`eval/suites/providers.test.ts` 按各家文档的规则模拟四家服务，`tools/test-providers.mjs` 在真实面板里跑 Claude 和 DeepSeek。
 - 临时替换模型配置前保存原值，配置缺失也要记录。所有临时修改都必须能在 `finally` 中恢复。凭据不得打印到日志、截图、代码或文档。
 - 报告验证结果时明确说明使用了模拟模型响应。真实模型的回答质量和服务连接需要实际调用才能确认。
 

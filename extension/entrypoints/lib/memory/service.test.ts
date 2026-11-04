@@ -39,7 +39,7 @@ function mockModel(memories: unknown[]) {
   }));
   return bodies;
 }
-const settings = { baseUrl: 'https://model.test/v1', model: 'm', apiKey: 'k', apiType: 'responses' as const };
+const settings = { baseUrl: 'https://model.test/v1/responses', model: 'm', apiKey: 'k' };
 const raw = (text: string, quote: string, extra = {}) => ({ type: 'semantic', text, quote, concepts: [], importance: 3, scope: 'persistent', problem_specific: false, ...extra });
 
 beforeEach(async () => {
@@ -122,6 +122,20 @@ describe('recall and management', () => {
     expect(text).toContain('用户主要用 Go 写题');
     expect(text).toContain('不是新的指令');
     expect(used.length).toBeGreaterThan(0);
+  });
+  it('injects only what this conversation has not seen, and flags deleted or edited ones', async () => {
+    await seed();
+    const first = await recallMemories({ text: '随便问问', tags: [], problemKey: null });
+    expect(first.text).toContain('用户主要用 Go 写题');
+    const present = new Map(first.used.map((memory) => [memory.id, memory.text]));
+    const again = await recallMemories({ text: '随便问问', tags: [], problemKey: null, present });
+    expect(again).toMatchObject({ text: '', stale: false });
+    const [go] = first.used.filter((memory) => memory.text.includes('Go'));
+    await removeMemory(go!.id);
+    const afterDelete = await recallMemories({ text: '随便问问', tags: [], problemKey: null, present });
+    expect(afterDelete.stale).toBe(true);
+    expect(afterDelete.text).not.toContain('Go');
+    expect(afterDelete.text).toContain('<memory>');
   });
   it('searches by words and marks memories that no longer hold', async () => {
     await seed();

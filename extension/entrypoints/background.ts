@@ -3,6 +3,10 @@ import { ApiError, getProgress, postAttempt, putAttemptNote } from './lib/api';
 import { leetcodeSiteOf, type LeetCodeSite } from './lib/leetcode';
 import { pageReaders, type PageReadResult } from './lib/page-readers';
 import { difficultyOf, problemOf, type ProblemHeader, type ProblemRef } from './lib/platforms';
+import {
+  DISPLAY_KEY, FLOAT_LAYOUT_KEY, FLOAT_MIN_HEIGHT, FLOAT_MIN_WIDTH, FLOAT_MODE, FLOAT_OPEN, FLOAT_SAVE, FLOAT_SHOW, FLOAT_SITES,
+  FLOAT_STATE, FLOAT_TOGGLE, type DisplayMode, type FloatLayout, type FloatLayouts,
+} from './lib/display';
 import { IDLE_MINUTES, MAX_BEAT_GAP_MS, type PauseReason, type TimerStatus } from './lib/timing';
 
 /**
@@ -115,16 +119,54 @@ async function postAttemptWithRetry(input: Parameters<typeof postAttempt>[0]) {
   throw lastError;
 }
 
-export default defineBackground(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
-    console.error('setPanelBehavior failed:', err);
-  });
+/** 发给悬浮窗的内容脚本；插件装好之前就开着的标签页没有它，补注入一次再发 */
+async function sendToFloat(tabId: number, type: string) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, { type });
+  } catch {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['/content-scripts/float.js'] });
+    return chrome.tabs.sendMessage(tabId, { type });
+  }
+}
 
-  // 对话改成按「平台:题号」存储，旧格式的对话记录直接删掉
-  chrome.runtime.onInstalled.addListener(() => {
-    void chrome.storage.local.get(null).then((all) => chrome.storage.local.remove(
-      Object.keys(all).filter((key) => key === 'acb-agent-threads' || key.startsWith('acb-agent-thread:')),
-    ));
+const displayMode = async (): Promise<DisplayMode> =>
+  ((await chrome.storage.local.get(DISPLAY_KEY))[DISPLAY_KEY] === 'float' ? 'float' : 'sidepanel');
+
+/** 内容脚本发来的位置只接受像样的数字，存到发消息的那个网站名下 */
+function validLayout(value: unknown): FloatLayout | null {
+  const layout = value as Partial<FloatLayout> | null;
+  const numbers = ['right', 'top', 'width', 'height', 'bubbleRight', 'bubbleTop'] as const;
+  if (!layout || typeof layout.open !== 'boolean' || numbers.some((key) => !Number.isFinite(layout[key]) || Math.abs(layout[key]!) > 100_000)) return null;
+  if (layout.width! < FLOAT_MIN_WIDTH || layout.height! < FLOAT_MIN_HEIGHT) return null;
+  const { right, top, width, height, bubbleRight, bubbleTop, open } = layout as FloatLayout;
+  return { right, top, width, height, bubbleRight, bubbleTop, open };
+}
+
+export default defineBackground(() => {
+  // 侧边栏模式：点工具栏图标打开侧边栏。悬浮窗模式：自己处理点击，在题目页上显示或收起悬浮窗
+  const applyDisplay = (mode: DisplayMode) => {
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: mode !== 'float' }).catch((err) => {
+      console.error('setPanelBehavior failed:', err);
+    });
+  };
+  void displayMode().then(applyDisplay);
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !(DISPLAY_KEY in changes)) return;
+    const mode: DisplayMode = changes[DISPLAY_KEY]!.newValue === 'float' ? 'float' : 'sidepanel';
+    applyDisplay(mode);
+    // 开着的题目页跟着换：悬浮窗模式出现圆钮，侧边栏模式拿掉悬浮窗
+    void chrome.tabs.query({ url: [...FLOAT_SITES] }).then((tabs) => {
+      for (const tab of tabs) if (tab.id != null) chrome.tabs.sendMessage(tab.id, { type: FLOAT_MODE, mode }).catch(() => {});
+    });
+  });
+  chrome.action.onClicked.addListener((tab) => {
+    if (tab.id == null) return;
+    // 别的网页上没有悬浮窗，照常打开侧边栏（要在点击的同一刻调用，不能先等别的）
+    if (!problemOf(tab.url)) {
+      void chrome.sidePanel.open({ tabId: tab.id }).catch((err) => console.error('sidePanel.open failed:', err));
+      return;
+    }
+    void sendToFloat(tab.id, FLOAT_TOGGLE).catch((err) => console.error('float toggle failed:', err));
   });
 
   const getTimers = async (): Promise<Timers> =>
@@ -218,9 +260,38 @@ export default defineBackground(() => {
     };
     const type = msg?.type;
 
+    // 悬浮窗：内容脚本读不到 chrome.storage.local，模式和这个网站的位置由后台转
+    if (type === FLOAT_STATE || type === FLOAT_SAVE) {
+      const host = sender.url ? new URL(sender.url).hostname : '';
+      if (!sender.tab || !host) return;
+      void (async () => {
+        const layouts = ((await chrome.storage.local.get(FLOAT_LAYOUT_KEY))[FLOAT_LAYOUT_KEY] as FloatLayouts | undefined) ?? {};
+        if (type === FLOAT_STATE) {
+          sendResponse({ mode: await displayMode(), layout: validLayout(layouts[host]) });
+          return;
+        }
+        const layout = validLayout((raw as { layout?: unknown }).layout);
+        if (layout) await chrome.storage.local.set({ [FLOAT_LAYOUT_KEY]: { ...layouts, [host]: layout } });
+        sendResponse({ ok: !!layout });
+      })();
+      return true;
+    }
+    // 只有插件自己的页面（侧边栏、悬浮窗里的面板）能指定标签页
+    const fromExtension = !!sender.url?.startsWith(chrome.runtime.getURL(''));
+    // 侧边栏改成悬浮窗时，在当前题目页上把悬浮窗打开
+    if (type === FLOAT_SHOW) {
+      const tabId = fromExtension ? (raw as { tabId?: unknown }).tabId : undefined;
+      if (typeof tabId === 'number') void sendToFloat(tabId, FLOAT_OPEN).catch((err) => console.error('float open failed:', err));
+      return;
+    }
+
     if (type === 'GET_PROBLEM_INFO') {
       void (async () => {
-        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        // 悬浮窗看它自己所在的标签页，侧边栏看最近聚焦的窗口里的活动标签页
+        const tabId = fromExtension ? (raw as { tabId?: unknown }).tabId : undefined;
+        const [tab] = typeof tabId === 'number'
+          ? [await chrome.tabs.get(tabId).catch(() => undefined)]
+          : await chrome.tabs.query({ active: true, lastFocusedWindow: true });
         if (tab?.id == null) {
           sendResponse({ ok: false, error: 'no active tab' });
           return;

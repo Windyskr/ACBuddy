@@ -240,7 +240,7 @@ try {
     return { hasSettings: '${SETTINGS_KEY}' in d, settings: d['${SETTINGS_KEY}'] ?? null, ids: (d['${CATALOG_KEY}']?.conversations ?? []).map((c) => c.id) };
   }`, panelId);
   await ev(`async () => {
-    await chrome.storage.local.set({ '${SETTINGS_KEY}': { baseUrl: '${MOCK_BASE}', model: 'e2e-model', apiKey: 'e2e-key', apiType: 'responses' } });
+    await chrome.storage.local.set({ '${SETTINGS_KEY}': { baseUrl: '${MOCK_BASE}/responses', model: 'e2e-model', apiKey: 'e2e-key' } });
     setTimeout(() => location.reload(), 50);
     return true;
   }`, panelId).catch(() => null);

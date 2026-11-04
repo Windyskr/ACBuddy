@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import type { ApiType } from '../entrypoints/lib/agent-protocol';
+import { apiTypeOfUrl } from '../entrypoints/lib/providers';
 import { modelLlm } from '../entrypoints/lib/memory/model-llm';
 import type { Llm, LlmReply, LlmRequest } from '../entrypoints/lib/memory/types';
 
@@ -79,8 +79,7 @@ export function llmFromEnv(cacheFile: string, prefix = 'EVAL'): Llm {
   const baseUrl = process.env[`${prefix}_BASE_URL`];
   const apiKey = process.env[`${prefix}_API_KEY`];
   const model = process.env[`${prefix}_MODEL`] ?? 'replay';
-  const apiType = (process.env[`${prefix}_API_TYPE`] ?? 'chat-completions') as ApiType;
-  // 走插件同一套协议层，评测和线上是同一份请求和解析代码
-  const inner = baseUrl && apiKey ? modelLlm({ baseUrl, apiKey, model, apiType }, { retries: 5, timeoutMs: 180_000 }) : null;
-  return new CachedLlm(inner, cacheFile, `${model}|${apiType}`);
+  // 走插件同一套协议层，评测和线上是同一份请求和解析代码；用哪种接口和插件一样按地址判断
+  const inner = baseUrl && apiKey ? modelLlm({ baseUrl, apiKey, model }, { retries: 5, timeoutMs: 180_000 }) : null;
+  return new CachedLlm(inner, cacheFile, `${model}|${apiTypeOfUrl(baseUrl ?? '')}`);
 }

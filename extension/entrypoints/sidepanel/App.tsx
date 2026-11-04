@@ -3,6 +3,7 @@ import { getMe, getProgress, openSite, type Progress } from '../lib/api';
 import { PLATFORMS, problemLabel, type ProblemHeader } from '../lib/platforms';
 import { IDLE_MINUTES, type TimerStatus } from '../lib/timing';
 import AgentChat from './AgentChat';
+import { floatTab, isFloat } from './float';
 import { PauseIcon, PlayIcon, RestartIcon } from './icons';
 import './panel.css';
 
@@ -41,12 +42,15 @@ export default function App() {
       refreshMe();
       fetchProblem();
     };
-    // 页面内切题（地址变了、没有整页加载）也要刷新顶栏
+    // 页面内切题（地址变了、没有整页加载）也要刷新顶栏。悬浮窗只看自己所在的标签页，换标签页不用管
     const onUpdated = (_tabId: number, change: { url?: string }, tab: chrome.tabs.Tab) => {
-      if (change.url && tab.active) fetchProblem();
+      if (!change.url) return;
+      if (!isFloat) {
+        if (tab.active) fetchProblem();
+      } else void floatTab().then((own) => { if (own?.id === tab.id) fetchProblem(); });
     };
     window.addEventListener('focus', sync);
-    chrome.tabs.onActivated.addListener(sync);
+    if (!isFloat) chrome.tabs.onActivated.addListener(sync);
     chrome.tabs.onUpdated.addListener(onUpdated);
     const onBg = (msg: { type?: string; slug?: string; result?: string }) => {
       if (msg.type === 'PROBLEM_CHANGED') {
@@ -140,7 +144,7 @@ export default function App() {
       clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
     }
-    chrome.runtime.sendMessage({ type: 'GET_PROBLEM_INFO' }, (res: unknown) => {
+    void (isFloat ? floatTab() : Promise.resolve(undefined)).then((own) => chrome.runtime.sendMessage({ type: 'GET_PROBLEM_INFO', ...(own?.id != null ? { tabId: own.id } : {}) }, (res: unknown) => {
       const err = chrome.runtime.lastError;
       const p = err ? null : (res as { ok: boolean; error?: string; problem?: ProblemHeader | null } | null);
       if (err || !p?.ok) {
@@ -172,7 +176,7 @@ export default function App() {
         setProgress(null);
         setPage('other');
       }
-    });
+    }));
   };
 
   const problemTitle = problem && problemLabel(problem.number, problem.title);
