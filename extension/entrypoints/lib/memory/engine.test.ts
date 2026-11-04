@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ScriptedLlm } from '../../../eval/llm';
-import { DEFAULT_ENGINE, MemoryEngine } from './engine';
+import { DEFAULT_ENGINE, localDay, MemoryEngine } from './engine';
 import { parseExtraction, transcript, type SessionInput } from './extract';
 import { checkCandidate, DEFAULT_GATE, findQuotedMessage, parseCandidate, supportScore, type Candidate } from './gate';
 import { parseOperations, reconcile } from './reconcile';
@@ -253,4 +253,12 @@ describe('MemoryEngine.remove', () => {
 
 it('default engine keeps every safeguard on', () => {
   expect(DEFAULT_ENGINE).toMatchObject({ minimizeInput: true, reconcile: true, attemptEpisodes: true, gate: { evidence: true } });
+});
+
+describe('memory dates', () => {
+  it('uses the local day, so an early-morning attempt is not dated the day before', () => {
+    // 本地时间 11 月 5 日凌晨 1:30；东八区的 UTC 日期还是 4 日
+    expect(localDay(new Date(2026, 10, 5, 1, 30).getTime())).toBe('2026-11-05');
+    expect(localDay(new Date(2026, 0, 9, 23, 59).getTime())).toBe('2026-01-09');
+  });
 });

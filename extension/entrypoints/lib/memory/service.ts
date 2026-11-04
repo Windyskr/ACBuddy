@@ -2,7 +2,7 @@ import type { AgentMessage, AgentSettings } from '../agent';
 import { clearRemoteMemories, currentUser, getProgress, pullMemories, pushMemories, type Attempt } from '../api';
 import type { Conversation } from '../agent-conversation';
 import { PLATFORMS, type PlatformId } from '../platforms';
-import { MemoryEngine } from './engine';
+import { localDay, MemoryEngine } from './engine';
 import type { SessionInput } from './extract';
 import { modelLlm } from './model-llm';
 import { IdbMemoryStore } from './store-idb';
@@ -110,8 +110,8 @@ export async function searchMemories(query: string) {
   const hits = await offline.search({ text: query, tags: [], problemKey: null, now: Date.now() });
   return hits.map(({ memory }) => ({
     text: memory.text,
-    time: new Date(memory.validFrom).toISOString().slice(0, 10),
-    ...(memory.invalidAt != null ? { noLongerTrueSince: new Date(memory.invalidAt).toISOString().slice(0, 10) } : {}),
+    time: localDay(memory.validFrom),
+    ...(memory.invalidAt != null ? { noLongerTrueSince: localDay(memory.invalidAt) } : {}),
   }));
 }
 

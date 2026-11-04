@@ -43,7 +43,12 @@ const WEAK_WINDOW_DAYS = 60;
 const WEAK_MIN_FAILS = 3;
 const REFLECTION_PREFIX = 'reflection:';
 
-const day = (time: number) => new Date(time).toISOString().slice(0, 10);
+/** 用户本地的日期（YYYY-MM-DD）。不能用 UTC：东八区早上 8 点前的判题会记成前一天 */
+export const localDay = (time: number) => {
+  const date = new Date(time);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+const day = localDay;
 
 /** 判题记录由代码写成事件记忆，不经过模型：它是客观事实，也不会被题面里的文字污染 */
 function attemptEpisode(session: SessionInput, memories: MemoryRecord[], newId: () => string): MemoryRecord | null {
