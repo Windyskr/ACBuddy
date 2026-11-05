@@ -1,11 +1,40 @@
 # ACBuddy 🔥
 
-面试高频 LeetCode 题目整理与刷题记录工具。
-纯静态 SPA（React + Tailwind），筛选、排序、搜索全部在浏览器端完成，可直接部署到 Cloudflare Pages。
-
 ![技术栈](https://img.shields.io/badge/React-19-blue) ![Tailwind](https://img.shields.io/badge/Tailwind-v4-38bdf8) ![Vite](https://img.shields.io/badge/Vite-6-purple) ![Cloudflare Pages](https://img.shields.io/badge/Cloudflare-Pages-f6821f)
 
-## 功能
+开源的刷题助手，帮你准备求职面试里的算法题：浏览器插件在刷题网站上记录作答、辅导解题，网站 [acbuddy.pages.dev](https://acbuddy.pages.dev) 整理面试高频题和你的刷题进度。
+
+- **自动记录**：在力扣国内版、国际版点「提交」后，记下判题结果、用时和语言，再弹出心得卡，随手写下思路
+- **AI 辅导**：在力扣、牛客、洛谷、AtCoder 等 6 个刷题网站上读题、看代码，给思路提示或者检查代码，指出出错的行；力扣上运行或提交没通过时，还能看到失败的用例和报错。模型服务和 API Key 用你自己的
+- **记忆**：记住你的目标、讲题偏好和常犯的错，以后辅导时用上；可以随时查看、修改、删除，登录后跟随账号同步
+- **侧边栏或悬浮窗**：助手放在侧边栏，或者浮在题目页上，可以拖动、调整大小、收起成小圆钮
+- **网站**：按难度、标签筛选题目，管理掌握程度、个人标签和笔记，插件记下的作答自动同步过来
+
+<table>
+  <tr>
+    <td colspan="2" align="center"><img src="docs/images/ai-review.png" alt="两数之和的解答错误：AI 读取判题结果和当前代码，在编辑器里标出出错的行"><br>AI 查错：读取判题结果和当前代码，在编辑器里标出出错的行</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/images/record.png" alt="爬楼梯提交通过，页面右上角弹出心得卡"><br>提交后记下结果和用时，弹出心得卡</td>
+    <td width="50%" align="center"><img src="docs/images/float.png" alt="三数之和页面上的悬浮窗，AI 按记住的偏好先给提示"><br>悬浮窗：按记住的偏好先给提示</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/images/memory.png" alt="记忆面板，按辅导方式、关于你、经历分组"><br>记忆：随时查看、修改、删除</td>
+    <td width="50%" align="center"><img src="docs/images/website.png" alt="网站的题目列表，带最近作答、掌握程度和个人标签"><br>网站：筛选题目，管理进度</td>
+  </tr>
+</table>
+
+## 安装浏览器插件
+
+- **Chrome**（116 及以上版本）：从 [Chrome 应用商店](https://chromewebstore.google.com/detail/acbuddy/hkjijhnnjghgndikpiaaeanilgpjfhfk)安装
+- **Edge**：从 [Edge 加载项商店](https://microsoftedge.microsoft.com/addons/detail/iaigoapdemeikeigannpdmncejmdkpel)安装
+- **无法访问 Chrome 应用商店**：按[安装指南](https://acbuddy.pages.dev/install)从 GitHub Actions 下载安装包，用开发者模式加载
+
+装好后在同一个浏览器登录 ACBuddy，打开力扣题目即可使用。用 AI 助手前，先在它的设置里填 API 地址、API Key 和模型。
+
+## 网站功能
+
+网站是 React + Tailwind 的单页应用，筛选、排序、搜索都在浏览器端完成。
 
 - **题目列表**：显示题号、中文名、难度（简单/中等/困难）、力扣标签，点击标题直达力扣题目页（国内版或国际版，在「显示设置」里切换；剑指 Offer 等国内版独有题始终打开国内版）
 - **组合筛选**：难度 × 掌握程度 × 标签 × 最新结果 × 个人标签（后两项需登录），筛选按钮直接显示选中的值
@@ -22,16 +51,6 @@
   首次登录会把本地已记录的进度自动合并上去，不会丢
 - **表格自定义**：列可拖拽排序、拖拽调宽、按需隐藏（「紧急」默认隐藏，可在「显示列」里打开），设置持久化
 - **分页**：20 / 50 / 100 条每页，带页码省略号
-
-## 安装浏览器插件
-
-插件在力扣国内版和国际版提交后自动记录结果和用时，弹出心得卡，侧边栏提供计时和 AI 辅导，记录同步到网站。
-
-- **Chrome**（116 及以上版本）：从 [Chrome 应用商店](https://chromewebstore.google.com/detail/acbuddy/hkjijhnnjghgndikpiaaeanilgpjfhfk)安装
-- **Edge**：打开同一个商店链接，先点页面顶部的「允许来自其他商店的扩展」，再添加
-- **无法访问 Chrome 应用商店**：按[安装指南](https://acbuddy.pages.dev/install)从 GitHub Actions 下载安装包，用开发者模式加载
-
-装好后在同一个浏览器登录 ACBuddy，打开力扣题目即可使用。
 
 ## 快速开始
 
@@ -120,6 +139,7 @@ CSRF 防线，放进去的来源等同于能代表用户读写全部数据。安
 
 ```
 ├── agents.md                   # AI 代理开发约定（开发阶段声明）
+├── docs/                       # 记忆系统的设计文档，README 用的截图
 ├── public/_headers             # Cloudflare Pages 安全响应头（CSP / frame-ancestors / 缓存）
 ├── functions/api/[[route]].ts  # Pages Functions 后端（/api/*），即接口契约
 ├── migrations/                 # D1 基础 schema 与保留数据的增量迁移
