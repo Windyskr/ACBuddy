@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-const CHROME_STORE_URL = "https://chromewebstore.google.com/detail/acbuddy/hkjijhnnjghgndikpiaaeanilgpjfhfk";
 const GITHUB_URL = "https://github.com/Windyskr/acbuddy";
 const DOWNLOAD_URL = `${GITHUB_URL}/actions/workflows/extension-zip.yml?query=branch%3Amain+is%3Asuccess`;
 
@@ -11,7 +10,14 @@ const BROWSERS = {
 };
 type Browser = keyof typeof BROWSERS;
 
+const STORES: Record<Browser, { name: string; url: string }> = {
+  chrome: { name: "Chrome 应用商店", url: "https://chromewebstore.google.com/detail/acbuddy/hkjijhnnjghgndikpiaaeanilgpjfhfk" },
+  edge: { name: "Edge 加载项商店", url: "https://microsoftedge.microsoft.com/addons/detail/iaigoapdemeikeigannpdmncejmdkpel" },
+};
+
 const IS_EDGE = navigator.userAgent.includes("Edg/");
+// 当前浏览器的商店排前面，用主按钮
+const STORE_ORDER: Browser[] = IS_EDGE ? ["edge", "chrome"] : ["chrome", "edge"];
 const LINK_CLASS = "font-medium text-brand-700 underline decoration-brand-300 underline-offset-4 hover:text-brand-800";
 const CODE_CLASS = "rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700";
 
@@ -66,17 +72,23 @@ export default function InstallGuide({ authed, onLogin }: { authed: boolean; onL
         <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
           在力扣国内版和国际版提交后，自动记录结果和用时，随手写下心得，进度同步到题目列表。
         </p>
-        <a
-          href={CHROME_STORE_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-        >
-          从 Chrome 应用商店安装 <span aria-hidden="true">↗</span>
-        </a>
-        {IS_EDGE && (
-          <p className="mt-3 text-sm leading-6 text-slate-500">Edge 打开商店页面后，先点顶部提示里的「允许来自其他商店的扩展」，再点「添加至 Chrome」。</p>
-        )}
+        <div className="mt-6 flex flex-wrap gap-3">
+          {STORE_ORDER.map((key, index) => (
+            <a
+              key={key}
+              href={STORES[key].url}
+              target="_blank"
+              rel="noreferrer"
+              className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
+                index === 0
+                  ? "border-brand-600 bg-brand-600 text-white hover:border-brand-700 hover:bg-brand-700"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:text-brand-700"
+              }`}
+            >
+              从 {STORES[key].name}安装 <span aria-hidden="true">↗</span>
+            </a>
+          ))}
+        </div>
         <p className="mt-4 text-xs leading-6 text-slate-400">支持电脑端 Chrome 116 及以上版本和 Edge</p>
       </section>
 
